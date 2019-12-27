@@ -18,6 +18,9 @@ AC_SUBST([PICKY_CXXFLAGS])
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_RANLIB
+AC_PATH_PROG([CLANG_FORMAT], [clang-format], [])
+AS_IF([test x"$CLANG_FORMAT" = x],
+  [AC_MSG_ERROR([cannot find clang-format])])
 
 # Checks for libraries.
 
