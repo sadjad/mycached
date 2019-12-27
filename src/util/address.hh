@@ -17,14 +17,14 @@ public:
   class Raw
   {
   public:
-    sockaddr_storage storage{}; //!< The wrapped struct itself.
+    sockaddr_storage storage {}; //!< The wrapped struct itself.
     operator sockaddr*();
     operator const sockaddr*() const;
   };
 
 private:
   socklen_t _size; //!< Size of the wrapped address.
-  Raw _address{};  //!< A wrapped [sockaddr_storage](@ref man7::socket) containing the address.
+  Raw _address {}; //!< A wrapped [sockaddr_storage](@ref man7::socket) containing the address.
 
   //! Constructor from ip/host, service/port, and hints to the resolver.
   Address( const std::string& node, const std::string& service, const addrinfo& hints );

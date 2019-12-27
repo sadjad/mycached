@@ -125,7 +125,7 @@ void UDPSocket::recv( received_datagram& datagram, const size_t mtu )
 
 UDPSocket::received_datagram UDPSocket::recv( const size_t mtu )
 {
-  received_datagram ret{ { nullptr, 0 }, "" };
+  received_datagram ret { { nullptr, 0 }, "" };
   recv( ret, mtu );
   return ret;
 }
@@ -137,7 +137,7 @@ void sendmsg_helper( const int fd_num,
 {
   auto iovecs = payload.as_iovecs();
 
-  msghdr message{};
+  msghdr message {};
   message.msg_name = const_cast<sockaddr*>( destination_address );
   message.msg_namelen = destination_address_len;
   message.msg_iov = iovecs.data();

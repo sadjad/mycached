@@ -38,11 +38,11 @@ public:
   };
 
 private:
-  Mode mode_{ Mode::not_set };
-  State state_{ State::not_connected };
+  Mode mode_ { Mode::not_set };
+  State state_ { State::not_connected };
 
-  std::deque<std::string> write_buffer_{};
-  std::string read_buffer_{};
+  std::deque<std::string> write_buffer_ {};
+  std::string read_buffer_ {};
 
 public:
   NBSecureSocket( SecureSocket&& sock )

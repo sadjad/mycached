@@ -138,8 +138,8 @@ void NBSecureSocket::continue_SSL_read()
 
 string NBSecureSocket::ezread()
 {
-  string buffer{ move( read_buffer_ ) };
-  read_buffer_ = string{};
+  string buffer { move( read_buffer_ ) };
+  read_buffer_ = string {};
   return buffer;
 }
 

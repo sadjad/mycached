@@ -82,7 +82,7 @@ Address::Address( const string& node, const string& service, const addrinfo& hin
 //! man3::getaddrinfo)
 static inline addrinfo make_hints( const int ai_flags, const int ai_family )
 {
-  addrinfo hints{}; // value initialized to all zeros
+  addrinfo hints {}; // value initialized to all zeros
   hints.ai_flags = ai_flags;
   hints.ai_family = ai_family;
   return hints;
@@ -104,8 +104,8 @@ Address::Address( const string& ip, const uint16_t port )
 // accessors
 pair<string, uint16_t> Address::ip_port() const
 {
-  array<char, NI_MAXHOST> ip{};
-  array<char, NI_MAXSERV> port{};
+  array<char, NI_MAXHOST> ip {};
+  array<char, NI_MAXSERV> port {};
 
   const int gni_ret =
     getnameinfo( _address, _size, ip.data(), ip.size(), port.data(), port.size(), NI_NUMERICHOST | NI_NUMERICSERV );
@@ -128,7 +128,7 @@ uint32_t Address::ipv4_numeric() const
     throw runtime_error( "ipv4_numeric called on non-IPV4 address" );
   }
 
-  sockaddr_in ipv4_addr{};
+  sockaddr_in ipv4_addr {};
   memcpy( &ipv4_addr, &_address.storage, _size );
 
   return be32toh( ipv4_addr.sin_addr.s_addr );
@@ -136,7 +136,7 @@ uint32_t Address::ipv4_numeric() const
 
 Address Address::from_ipv4_numeric( const uint32_t ip_address )
 {
-  sockaddr_in ipv4_addr{};
+  sockaddr_in ipv4_addr {};
   ipv4_addr.sin_family = AF_INET;
   ipv4_addr.sin_addr.s_addr = htobe32( ip_address );
 

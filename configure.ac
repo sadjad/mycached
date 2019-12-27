@@ -23,6 +23,7 @@ AS_IF([test x"$CLANG_FORMAT" = x],
   [AC_MSG_ERROR([cannot find clang-format])])
 
 # Checks for libraries.
+PKG_CHECK_MODULES([SSL],[libssl libcrypto])
 
 # Checks for header files.
 AC_LANG_PUSH(C++)

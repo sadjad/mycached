@@ -13,8 +13,8 @@
 class Buffer
 {
 private:
-  std::shared_ptr<std::string> _storage{};
-  size_t _starting_offset{};
+  std::shared_ptr<std::string> _storage {};
+  size_t _starting_offset {};
 
 public:
   Buffer() = default;
@@ -59,7 +59,7 @@ public:
 class BufferList
 {
 private:
-  std::deque<Buffer> _buffers{};
+  std::deque<Buffer> _buffers {};
 
 public:
   //! \name Constructors
@@ -69,13 +69,13 @@ public:
 
   //! \brief Construct from a Buffer
   BufferList( Buffer buffer )
-    : _buffers{ buffer }
+    : _buffers { buffer }
   {}
 
   //! \brief Construct by taking ownership of a std::string
   BufferList( std::string&& str ) noexcept
   {
-    Buffer buf{ std::move( str ) };
+    Buffer buf { std::move( str ) };
     append( buf );
   }
   //!@}
@@ -103,7 +103,7 @@ public:
 //! \brief A non-owning temporary view (similar to std::string_view) of a discontiguous string
 class BufferViewList
 {
-  std::deque<std::string_view> _views{};
+  std::deque<std::string_view> _views {};
 
 public:
   //! \name Constructors

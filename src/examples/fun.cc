@@ -5,12 +5,16 @@
 #include <unistd.h>
 
 #include "exception.hh"
+#include "nb_secure_socket.hh"
 
 using namespace std;
 
 void program_body()
 {
-  CheckSystemCall( "hello", write( STDOUT_FILENO, "hi", 3 ) );
+  SSLContext ssl_context;
+
+  TCPSocket tcp_sock;
+  tcp_sock.set_blocking( false );
 }
 
 int main()
