@@ -18,6 +18,7 @@ class FileDescriptor
     int _fd;                   //!< The file descriptor number returned by the kernel
     bool _eof = false;         //!< Flag indicating whether FDWrapper::_fd is at EOF
     bool _closed = false;      //!< Flag indicating whether FDWrapper::_fd has been closed
+    bool _non_blocking = true; //!< Flag indicating whether FDWrapper::_fd is non-blocking
     unsigned _read_count = 0;  //!< The number of times FDWrapper::_fd has been read
     unsigned _write_count = 0; //!< The numberof times FDWrapper::_fd has been written
 
@@ -27,6 +28,8 @@ class FileDescriptor
     ~FDWrapper();
     //! Calls [close(2)](\ref man2::close) on FDWrapper::_fd
     void close();
+
+    int CheckSystemCall( const std::string_view s_attempt, const int return_value ) const;
 
     //! \name
     //! An FDWrapper cannot be copied or moved
@@ -56,6 +59,11 @@ protected:
     } else {
       register_read();
     }
+  }
+
+  int CheckSystemCall( const std::string_view s_attempt, const int return_value ) const
+  {
+    return _internal_fd->CheckSystemCall( s_attempt, return_value );
   }
 
 public:
@@ -90,7 +98,7 @@ public:
   FileDescriptor duplicate() const;
 
   //! Set blocking(true) or non-blocking(false)
-  void set_blocking( const bool blocking_state );
+  void set_blocking( const bool blocking );
 
   //! \name FDWrapper accessors
   //!@{

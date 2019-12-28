@@ -20,12 +20,16 @@ public:
   {
     DNS,
     SSL,
+    Nonblock,
+    WaitingToConnect,
     count
   };
 
   constexpr static size_t num_categories = static_cast<size_t>( Category::count );
 
-  constexpr static std::array<const char*, num_categories> _category_names { { "DNS", "SSL" } };
+  constexpr static std::array<const char*, num_categories> _category_names {
+    { "DNS", "SSL", "Nonblocking operations", "Waiting to connect" }
+  };
 
 private:
   uint64_t _beginning_timestamp = timestamp_ns();
@@ -85,7 +89,7 @@ public:
   std::string summary() const { return _log.summary(); }
 };
 
-inline Timer& global_timer()
+inline Timer& timer()
 {
   static Timer the_global_timer;
   return the_global_timer;

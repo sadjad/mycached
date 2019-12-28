@@ -37,7 +37,7 @@ string Log::summary() const
   }
 
   const uint64_t unaccounted = elapsed - accounted;
-  out << "   Unaccounted: " << string( 23, ' ' );
+  out << "\n   Unaccounted: " << string( 23, ' ' );
   out << 100 * unaccounted / double( elapsed ) << "%\n";
 
   return out.str();

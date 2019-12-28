@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "address.hh"
+#include "eventloop.hh"
 #include "exception.hh"
 #include "nb_secure_socket.hh"
 #include "timer.hh"
@@ -14,26 +15,51 @@ using t = Log::Category;
 
 void program_body()
 {
-  global_timer().start<t::SSL>();
+  timer().start<t::SSL>();
   SSLContext ssl_context;
-  global_timer().stop<t::SSL>();
+  timer().stop<t::SSL>();
 
   TCPSocket tcp_sock;
   tcp_sock.set_blocking( false );
 
-  global_timer().start<t::DNS>();
+  timer().start<t::DNS>();
   Address addr { "cs.stanford.edu", "https" };
-  global_timer().stop<t::DNS>();
+  timer().stop<t::DNS>();
+
+  timer().start<t::Nonblock>();
+  tcp_sock.connect( addr );
+  timer().stop<t::Nonblock>();
+
+  bool connected = false;
+
+  {
+    EventLoop event_loop;
+    event_loop.add_rule(
+      tcp_sock,
+      Direction::Out,
+      [&] {
+        tcp_sock.throw_if_error();
+        connected = true;
+      },
+      [&] { return not connected; } );
+
+    timer().start<t::WaitingToConnect>();
+    event_loop.wait_next_event( -1 );
+    timer().stop<t::WaitingToConnect>();
+  }
+
+  cout << tcp_sock.local_address().to_string() << " -> " << tcp_sock.peer_address().to_string() << "\n";
 }
 
 int main()
 {
   try {
-    global_timer();
+    timer();
     program_body();
-    cout << global_timer().summary() << "\n";
+    cout << timer().summary() << "\n";
   } catch ( const exception& e ) {
     cerr << "Exception: " << e.what() << endl;
+    cerr << timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 

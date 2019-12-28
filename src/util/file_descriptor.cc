@@ -18,6 +18,9 @@ FileDescriptor::FDWrapper::FDWrapper( const int fd )
   if ( fd < 0 ) {
     throw runtime_error( "invalid fd number:" + to_string( fd ) );
   }
+
+  const int flags = CheckSystemCall( "fcntl", fcntl( fd, F_GETFL ) );
+  _non_blocking = flags & O_NONBLOCK;
 }
 
 void FileDescriptor::FDWrapper::close()
@@ -112,14 +115,29 @@ size_t FileDescriptor::write( BufferViewList buffer, const bool write_all )
   return total_bytes_written;
 }
 
-void FileDescriptor::set_blocking( const bool blocking_state )
+void FileDescriptor::set_blocking( const bool blocking )
 {
   int flags = CheckSystemCall( "fcntl", fcntl( fd_num(), F_GETFL ) );
-  if ( blocking_state ) {
+  if ( blocking ) {
     flags ^= ( flags & O_NONBLOCK );
   } else {
     flags |= O_NONBLOCK;
   }
 
   CheckSystemCall( "fcntl", fcntl( fd_num(), F_SETFL, flags ) );
+
+  _internal_fd->_non_blocking = not blocking;
+}
+
+int FileDescriptor::FDWrapper::CheckSystemCall( const string_view s_attempt, const int return_value ) const
+{
+  if ( return_value >= 0 ) {
+    return return_value;
+  }
+
+  if ( _non_blocking and ( errno == EAGAIN or errno == EINPROGRESS ) ) {
+    return 0;
+  }
+
+  throw unix_error( s_attempt );
 }
