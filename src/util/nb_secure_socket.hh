@@ -83,4 +83,18 @@ public:
     return ( state_ != State::needs_accept ) and ( state_ != State::needs_ssl_read_to_accept ) and
            ( state_ != State::needs_ssl_write_to_accept );
   }
+
+  bool needs_write() const
+  {
+    return state_ == State::needs_connect or state_ == State::needs_ssl_write_to_connect or
+           state_ == State::needs_ssl_write_to_accept or state_ == State::needs_ssl_write_to_write or
+           state_ == State::needs_ssl_write_to_read;
+  }
+
+  bool needs_read() const
+  {
+    return state_ == State::needs_connect or state_ == State::needs_ssl_read_to_connect or
+           state_ == State::needs_ssl_read_to_accept or state_ == State::needs_ssl_read_to_write or
+           state_ == State::needs_ssl_read_to_read;
+  }
 };
