@@ -1,6 +1,7 @@
 #include "eventloop.hh"
 
 #include "exception.hh"
+#include "socket.hh"
 
 #include <cerrno>
 #include <stdexcept>
@@ -25,9 +26,10 @@ void EventLoop::add_rule( const FileDescriptor& fd,
                           const Direction direction,
                           const CallbackT& callback,
                           const InterestT& interest,
-                          const CallbackT& cancel )
+                          const CallbackT& cancel,
+                          const CallbackT& error )
 {
-  _rules.push_back( { fd.duplicate(), direction, callback, interest, cancel } );
+  _rules.push_back( { fd.duplicate(), direction, callback, interest, cancel, error } );
 }
 
 //! \param[in] timeout_ms is the timeout value passed to [poll(2)](\ref man2::poll); `wait_next_event`
@@ -111,13 +113,15 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 
   for ( auto [it, idx] = make_pair( _rules.begin(), size_t( 0 ) ); it != _rules.end(); ++idx ) {
     const auto& this_pollfd = pollfds[idx];
+    const auto& this_rule = *it;
 
     const auto poll_error = static_cast<bool>( this_pollfd.revents & ( POLLERR | POLLNVAL ) );
     if ( poll_error ) {
-      throw runtime_error( "EventLoop: error on polled file descriptor" );
+      this_rule.error();
+      it = _rules.erase( it );
+      continue;
     }
 
-    const auto& this_rule = *it;
     const auto poll_ready = static_cast<bool>( this_pollfd.revents & this_pollfd.events );
     const auto poll_hup = static_cast<bool>( this_pollfd.revents & POLLHUP );
     if ( poll_hup && this_pollfd.events && !poll_ready ) {

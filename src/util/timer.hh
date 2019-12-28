@@ -44,7 +44,7 @@ private:
   std::array<Record, num_categories> _logs {};
 
 public:
-  inline void log( const Category category, const uint64_t time_ns )
+  void log( const Category category, const uint64_t time_ns )
   {
     auto& entry = _logs[static_cast<size_t>( category )];
 

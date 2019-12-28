@@ -23,32 +23,33 @@ void program_body()
   tcp_sock.set_blocking( false );
 
   timer().start<t::DNS>();
-  Address addr { "cs.stanford.edu", "https" };
+  Address addr { "cs.stanford.edu", "443" };
   timer().stop<t::DNS>();
 
   timer().start<t::Nonblock>();
   tcp_sock.connect( addr );
   timer().stop<t::Nonblock>();
 
-  bool connected = false;
-
   {
+    bool connected = false;
     EventLoop event_loop;
     event_loop.add_rule(
       tcp_sock,
       Direction::Out,
       [&] {
         tcp_sock.throw_if_error();
+        tcp_sock.peer_address();
         connected = true;
       },
-      [&] { return not connected; } );
+      [&] { return not connected; },
+      [] {},
+      [&] { tcp_sock.throw_if_error(); } );
 
     timer().start<t::WaitingToConnect>();
-    event_loop.wait_next_event( -1 );
+    while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+    }
     timer().stop<t::WaitingToConnect>();
   }
-
-  cout << tcp_sock.local_address().to_string() << " -> " << tcp_sock.peer_address().to_string() << "\n";
 }
 
 int main()
