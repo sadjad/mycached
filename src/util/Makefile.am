@@ -10,4 +10,5 @@ libmushutil_a_SOURCES = exception.hh \
 	eventloop.hh eventloop.cc \
 	socket.hh socket.cc \
 	secure_socket.hh secure_socket.cc \
-	nb_secure_socket.hh nb_secure_socket.cc
+	nb_secure_socket.hh nb_secure_socket.cc \
+	timer.hh timer.cc
