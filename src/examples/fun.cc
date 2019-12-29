@@ -7,7 +7,7 @@
 #include "address.hh"
 #include "eventloop.hh"
 #include "exception.hh"
-#include "nb_secure_socket.hh"
+#include "secure_socket.hh"
 #include "timer.hh"
 
 using namespace std;
@@ -52,38 +52,12 @@ void program_body()
   }
 
   timer().start<t::SSL>();
-  NBSecureSocket ssl_sock { ssl_context.new_secure_socket( move( tcp_sock ) ) };
+  SecureSocket ssl_sock { ssl_context.new_secure_socket( move( tcp_sock ) ) };
   timer().stop<t::SSL>();
 
   timer().start<t::Nonblock>();
   ssl_sock.connect();
   timer().stop<t::Nonblock>();
-
-  {
-    EventLoop event_loop;
-    event_loop.add_rule(
-      ssl_sock,
-      Direction::Out,
-      [&] { ssl_sock.continue_SSL_connect(); },
-      [&] { return ssl_sock.needs_write() and not ssl_sock.connected(); } );
-
-    event_loop.add_rule(
-      ssl_sock,
-      Direction::In,
-      [&] { ssl_sock.continue_SSL_connect(); },
-      [&] { return ssl_sock.needs_read() and not ssl_sock.connected(); } );
-
-    timer().start<t::WaitingToConnect>();
-    while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
-    }
-    timer().stop<t::WaitingToConnect>();
-
-    if ( not ssl_sock.connected() ) {
-      throw runtime_error( "did not connect SSL socket" );
-    }
-  }
-
-  ssl_sock.ezwrite( "GET /~keithw/ HTTP/1.1\n\n" );
 }
 
 int main()
