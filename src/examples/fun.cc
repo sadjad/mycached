@@ -23,7 +23,7 @@ void program_body()
   tcp_sock.set_blocking( false );
 
   timer().start<t::DNS>();
-  Address addr { "cs.stanford.edu", "443" };
+  Address addr { "localhost", "9090" };
   timer().stop<t::DNS>();
 
   timer().start<t::Nonblock>();
@@ -45,25 +45,36 @@ void program_body()
       [] {},
       [&] { tcp_sock.throw_if_error(); } );
 
-    timer().start<t::WaitingToConnect>();
     while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     }
-    timer().stop<t::WaitingToConnect>();
   }
 
-  timer().start<t::SSL>();
-  SecureSocket ssl_sock { ssl_context.new_secure_socket( move( tcp_sock ) ) };
-  timer().stop<t::SSL>();
+  string buf;
+  buf.resize( 256 );
+  simple_string_span available_buffer_span { buf };
 
-  timer().start<t::Nonblock>();
-  ssl_sock.connect();
-  timer().stop<t::Nonblock>();
+  {
+    EventLoop event_loop;
+    event_loop.add_rule(
+      tcp_sock,
+      Direction::In,
+      [&] {
+        size_t amount_read = tcp_sock.read( available_buffer_span );
+        available_buffer_span.remove_prefix( amount_read );
+        cerr << "Read " << amount_read << " bytes, available space now " << available_buffer_span.size() << "\n";
+      },
+      [&] { return available_buffer_span.size() > 0; },
+      [] {},
+      [&] { tcp_sock.throw_if_error(); } );
+
+    while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+    }
+  }
 }
 
 int main()
 {
   try {
-    timer();
     program_body();
     cout << timer().summary() << "\n";
   } catch ( const exception& e ) {

@@ -1,13 +1,14 @@
 #include "eventloop.hh"
 
-#include "exception.hh"
-#include "socket.hh"
-
 #include <cerrno>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include "exception.hh"
+#include "socket.hh"
+#include "timer.hh"
 
 using namespace std;
 
@@ -99,17 +100,15 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   }
 
   // call poll -- wait until one of the fds satisfies one of the rules (writeable/readable)
-  try {
+  {
+    ScopeTimer<Log::Category::WaitingForEvent> timer;
     if ( 0 == CheckSystemCall( "poll", ::poll( pollfds.data(), pollfds.size(), timeout_ms ) ) ) {
       return Result::Timeout;
-    }
-  } catch ( unix_error const& e ) {
-    if ( e.code().value() == EINTR ) {
-      return Result::Exit;
     }
   }
 
   // go through the poll results
+  ScopeTimer<Log::Category::Nonblock> timer;
 
   for ( auto [it, idx] = make_pair( _rules.begin(), size_t( 0 ) ); it != _rules.end(); ++idx ) {
     const auto& this_pollfd = pollfds[idx];

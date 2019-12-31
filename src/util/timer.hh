@@ -21,14 +21,14 @@ public:
     DNS,
     SSL,
     Nonblock,
-    WaitingToConnect,
+    WaitingForEvent,
     count
   };
 
   constexpr static size_t num_categories = static_cast<size_t>( Category::count );
 
   constexpr static std::array<const char*, num_categories> _category_names {
-    { "DNS", "SSL", "Nonblocking operations", "Waiting to connect" }
+    { "DNS", "SSL", "Nonblocking operations", "Waiting for event" }
   };
 
 private:
@@ -94,3 +94,11 @@ inline Timer& timer()
   static Timer the_global_timer;
   return the_global_timer;
 }
+
+template<Log::Category category>
+class ScopeTimer
+{
+public:
+  ScopeTimer() { timer().start<category>(); }
+  ~ScopeTimer() { timer().stop<category>(); }
+};
