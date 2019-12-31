@@ -84,10 +84,10 @@ public:
   void recv( received_datagram& datagram, const size_t mtu = 65536 );
 
   //! Send a datagram to specified Address
-  void sendto( const Address& destination, const BufferViewList& payload );
+  void sendto( const Address& destination, const std::string_view payload );
 
   //! Send datagram to the socket's connected address (must call connect() first)
-  void send( const BufferViewList& payload );
+  void send( const std::string_view payload );
 };
 
 //! A wrapper around [TCP sockets](\ref man7::tcp)

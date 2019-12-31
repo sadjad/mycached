@@ -1,11 +1,10 @@
 #pragma once
 
-#include "buffer.hh"
-
-#include <array>
 #include <cstddef>
 #include <limits>
 #include <memory>
+
+#include "simple_string_span.hh"
 
 //! A reference-counted handle to a file descriptor
 class FileDescriptor
@@ -73,23 +72,13 @@ public:
   //! Free the std::shared_ptr; the FDWrapper destructor calls close() when the refcount goes to zero.
   ~FileDescriptor() = default;
 
-  //! Read up to `limit` bytes
-  std::string read( const size_t limit = std::numeric_limits<size_t>::max() );
+  //! Read into `str`
+  //! \returns number of bytes read
+  size_t read( const simple_string_span buffer );
 
-  //! Read up to `limit` bytes into `str` (caller can allocate storage)
-  void read( std::string& str, const size_t limit = std::numeric_limits<size_t>::max() );
-
-  //! Write a string, possibly blocking until all is written
-  size_t write( const char* str, const bool write_all = true ) { return write( BufferViewList( str ), write_all ); }
-
-  //! Write a string, possibly blocking until all is written
-  size_t write( const std::string& str, const bool write_all = true )
-  {
-    return write( BufferViewList( str ), write_all );
-  }
-
-  //! Write a buffer (or list of buffers), possibly blocking until all is written
-  size_t write( BufferViewList buffer, const bool write_all = true );
+  //! Attempt to write a buffer
+  //! \returns number of bytes written
+  size_t write( const std::string_view buffer );
 
   //! Close the underlying file descriptor
   void close() { _internal_fd->close(); }

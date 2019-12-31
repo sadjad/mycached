@@ -130,35 +130,16 @@ UDPSocket::received_datagram UDPSocket::recv( const size_t mtu )
   return ret;
 }
 
-void sendmsg_helper( const int fd_num,
-                     const sockaddr* destination_address,
-                     const socklen_t destination_address_len,
-                     const BufferViewList& payload )
+void UDPSocket::sendto( const Address& destination, const string_view payload )
 {
-  auto iovecs = payload.as_iovecs();
-
-  msghdr message {};
-  message.msg_name = const_cast<sockaddr*>( destination_address );
-  message.msg_namelen = destination_address_len;
-  message.msg_iov = iovecs.data();
-  message.msg_iovlen = iovecs.size();
-
-  const ssize_t bytes_sent = CheckSystemCall( "sendmsg", ::sendmsg( fd_num, &message, 0 ) );
-
-  if ( size_t( bytes_sent ) != payload.size() ) {
-    throw runtime_error( "datagram payload too big for sendmsg()" );
-  }
-}
-
-void UDPSocket::sendto( const Address& destination, const BufferViewList& payload )
-{
-  sendmsg_helper( fd_num(), destination, destination.size(), payload );
+  CheckSystemCall( "sendto", ::sendto( fd_num(), payload.data(), payload.length(), 0,
+				       destination, destination.size() ) );
   register_write();
 }
 
-void UDPSocket::send( const BufferViewList& payload )
+void UDPSocket::send( const string_view payload )
 {
-  sendmsg_helper( fd_num(), nullptr, 0, payload );
+  CheckSystemCall( "send", ::send( fd_num(), payload.data(), payload.length(), 0 ) );
   register_write();
 }
 

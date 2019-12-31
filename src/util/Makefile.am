@@ -4,7 +4,6 @@ AM_CXXFLAGS = $(PICKY_CXXFLAGS)
 noinst_LIBRARIES = libmushutil.a
 
 libmushutil_a_SOURCES = exception.hh \
-	buffer.hh buffer.cc \
 	file_descriptor.hh file_descriptor.cc \
 	address.hh address.cc \
 	eventloop.hh eventloop.cc \
