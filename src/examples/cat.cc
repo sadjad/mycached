@@ -43,6 +43,7 @@ void program_body()
 int main()
 {
   try {
+    timer();
     program_body();
     cerr << timer().summary() << "\n";
   } catch ( const exception& e ) {
