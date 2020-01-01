@@ -25,8 +25,7 @@ private:
   static unsigned long id_function( void ) { return pthread_self(); }
 
 public:
-  OpenSSL()
-    : locks_( CRYPTO_num_locks() )
+  OpenSSL() : locks_( CRYPTO_num_locks() )
   {
     /* SSL initialization: Needs to be done exactly once */
     /* load algorithms/ciphers */
@@ -58,13 +57,9 @@ SSL_CTX* initialize_new_context()
   return ret;
 }
 
-SSLContext::SSLContext()
-  : ctx_( initialize_new_context() )
-{}
+SSLContext::SSLContext() : ctx_( initialize_new_context() ) {}
 
-SecureSocket::SecureSocket( TCPSocket&& sock, SSL* ssl )
-  : TCPSocket( move( sock ) )
-  , ssl_( ssl )
+SecureSocket::SecureSocket( TCPSocket&& sock, SSL* ssl ) : TCPSocket( move( sock ) ), ssl_( ssl )
 {
   if ( not ssl_ ) {
     throw runtime_error( "SecureSocket: constructor must be passed valid SSL structure" );

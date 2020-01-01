@@ -1,1 +1,1 @@
-SUBDIRS = util examples
+SUBDIRS = util examples tests

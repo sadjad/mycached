@@ -19,8 +19,7 @@ Socket::Socket( const int domain, const int type )
 //! \param[in] fd is the FileDescriptor from which to construct
 //! \param[in] domain is `fd`'s domain; throws std::runtime_error if wrong value is supplied
 //! \param[in] type is `fd`'s type; throws std::runtime_error if wrong value is supplied
-Socket::Socket( FileDescriptor&& fd, const int domain, const int type )
-  : FileDescriptor( move( fd ) )
+Socket::Socket( FileDescriptor&& fd, const int domain, const int type ) : FileDescriptor( move( fd ) )
 {
   int actual_value;
   socklen_t len;
@@ -132,8 +131,8 @@ UDPSocket::received_datagram UDPSocket::recv( const size_t mtu )
 
 void UDPSocket::sendto( const Address& destination, const string_view payload )
 {
-  CheckSystemCall( "sendto", ::sendto( fd_num(), payload.data(), payload.length(), 0,
-				       destination, destination.size() ) );
+  CheckSystemCall( "sendto",
+                   ::sendto( fd_num(), payload.data(), payload.length(), 0, destination, destination.size() ) );
   register_write();
 }
 

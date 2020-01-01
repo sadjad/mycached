@@ -8,5 +8,6 @@ libmushutil_a_SOURCES = exception.hh \
 	address.hh address.cc \
 	eventloop.hh eventloop.cc \
 	socket.hh socket.cc \
+	ring_buffer.hh ring_buffer.cc \
 	secure_socket.hh secure_socket.cc \
 	timer.hh timer.cc
