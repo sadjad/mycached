@@ -8,6 +8,7 @@
 #include "eventloop.hh"
 #include "exception.hh"
 #include "secure_socket.hh"
+#include "socket.hh"
 #include "timer.hh"
 
 using namespace std;
@@ -15,10 +16,6 @@ using t = Log::Category;
 
 void program_body()
 {
-  timer().start<t::SSL>();
-  SSLContext ssl_context;
-  timer().stop<t::SSL>();
-
   TCPSocket tcp_sock;
   tcp_sock.set_blocking( false );
 
@@ -29,6 +26,9 @@ void program_body()
   timer().start<t::Nonblock>();
   tcp_sock.connect( addr );
   timer().stop<t::Nonblock>();
+
+  SSLContext ssl_context;
+  SSLSession ssl { ssl_context.make_SSL_handle() };
 
   {
     bool connected = false;
@@ -42,28 +42,6 @@ void program_body()
         connected = true;
       },
       [&] { return not connected; },
-      [] {},
-      [&] { tcp_sock.throw_if_error(); } );
-
-    while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
-    }
-  }
-
-  string buf;
-  buf.resize( 256 );
-  simple_string_span available_buffer_span { buf };
-
-  {
-    EventLoop event_loop;
-    event_loop.add_rule(
-      tcp_sock,
-      Direction::In,
-      [&] {
-        size_t amount_read = tcp_sock.read( available_buffer_span );
-        available_buffer_span.remove_prefix( amount_read );
-        cerr << "Read " << amount_read << " bytes, available space now " << available_buffer_span.size() << "\n";
-      },
-      [&] { return available_buffer_span.size() > 0; },
       [] {},
       [&] { tcp_sock.throw_if_error(); } );
 

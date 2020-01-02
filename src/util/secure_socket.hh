@@ -5,50 +5,44 @@
 #include <openssl/ssl.h>
 
 #include "exception.hh"
-#include "socket.hh"
+#include "ring_buffer.hh"
 
-/* error category for OpenSSL */
+/* global OpenSSL behavior */
 class ssl_error_category : public std::error_category
 {
 public:
-  const char* name( void ) const noexcept override { return "SSL"; }
+  const char* name() const noexcept override { return "SSL"; }
   std::string message( const int ssl_error ) const noexcept override { return ERR_error_string( ssl_error, nullptr ); }
 };
 
 class ssl_error : public tagged_error
 {
 public:
-  ssl_error( const std::string_view s_attempt, const int error_code = ERR_get_error() )
-    : tagged_error( ssl_error_category(), s_attempt, error_code )
+  ssl_error( const std::string_view attempt, const int error_code )
+    : tagged_error( ssl_error_category(), attempt, error_code )
   {}
 };
 
-class SecureSocket : public TCPSocket
+class OpenSSL
 {
-  friend class SSLContext;
-
-private:
-  struct SSL_deleter
-  {
-    void operator()( SSL* x ) const { SSL_free( x ); }
-  };
-  typedef std::unique_ptr<SSL, SSL_deleter> SSL_handle;
-  SSL_handle ssl_;
-
-  SecureSocket( TCPSocket&& sock, SSL* ssl );
+  static void check_errors( const std::string_view context, const bool must_have_error );
 
 public:
-  void connect( void );
-  void accept( const bool register_as_write = false );
+  OpenSSL();
+  static OpenSSL& global_context();
 
-  std::string read( const bool register_as_write = false );
-  void write( const std::string& message, const bool register_as_read = false );
-  int get_error( const int return_value );
+  static void check( const std::string_view context ) { return check_errors( context, false ); }
+  static void throw_error( const std::string_view context ) { return check_errors( context, true ); }
 };
+
+struct SSL_deleter
+{
+  void operator()( SSL* x ) const { SSL_free( x ); }
+};
+typedef std::unique_ptr<SSL, SSL_deleter> SSL_handle;
 
 class SSLContext
 {
-private:
   struct CTX_deleter
   {
     void operator()( SSL_CTX* x ) const { SSL_CTX_free( x ); }
@@ -59,8 +53,26 @@ private:
 public:
   SSLContext();
 
-  SecureSocket new_secure_socket( TCPSocket&& sock );
+  SSL_handle make_SSL_handle();
+};
 
-  void use_certificate_file( const std::string& cert_file );
-  void use_private_key_file( const std::string& pkey_file );
+/* SSL session */
+class SSLSession
+{
+  static constexpr size_t storage_size = 65536;
+
+  SSL_handle ssl_;
+
+  RingBuffer outbound_plaintext_ { storage_size };
+  RingBuffer outbound_ciphertext_ { storage_size };
+
+  RingBuffer inbound_ciphertext_ { storage_size };
+  RingBuffer inbound_plaintext_ { storage_size };
+
+  int get_error( const int return_value ) const;
+
+public:
+  SSLSession( SSL_handle&& ssl );
+
+  void tick();
 };

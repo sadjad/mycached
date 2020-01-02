@@ -19,7 +19,6 @@ public:
   enum class Category
   {
     DNS,
-    SSL,
     Nonblock,
     WaitingForEvent,
     count
@@ -28,7 +27,7 @@ public:
   constexpr static size_t num_categories = static_cast<size_t>( Category::count );
 
   constexpr static std::array<const char*, num_categories> _category_names {
-    { "DNS", "SSL", "Nonblocking operations", "Waiting for event" }
+    { "DNS", "Nonblocking operations", "Waiting for event" }
   };
 
 private:
