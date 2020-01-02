@@ -37,11 +37,12 @@ class RingBuffer
   MMap_Region virtual_address_space_, first_mapping_, second_mapping_;
 
 public:
-  RingBuffer( const size_t capacity );
+  explicit RingBuffer( const size_t capacity );
 
   size_t capacity() const { return first_mapping_.length(); }
 
   simple_string_span writable_region();
+  std::string_view writable_region() const;
   void wrote( const size_t num_bytes );
 
   std::string_view readable_region() const;

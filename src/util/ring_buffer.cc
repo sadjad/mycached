@@ -13,7 +13,8 @@ MMap_Region::MMap_Region( char* const addr,
                           const int flags,
                           const int fd,
                           const off_t offset )
-  : addr_( static_cast<char*>( mmap( addr, length, prot, flags, fd, offset ) ) ), length_( length )
+  : addr_( static_cast<char*>( mmap( addr, length, prot, flags, fd, offset ) ) )
+  , length_( length )
 {
   if ( addr_ == MAP_FAILED ) {
     throw unix_error( "mmap" );
@@ -33,26 +34,31 @@ MMap_Region::~MMap_Region()
 
 RingBuffer::RingBuffer( const size_t capacity )
   : fd_( [&] {
-      if ( capacity % sysconf( _SC_PAGESIZE ) ) {
-        throw runtime_error( "RingBuffer capacity must be multiple of page size (" +
-                             to_string( sysconf( _SC_PAGESIZE ) ) + ")" );
-      }
-      FileDescriptor fd { CheckSystemCall( "memfd_create", memfd_create( "RingBuffer", 0 ) ) };
-      CheckSystemCall( "ftruncate", ftruncate( fd.fd_num(), 2 * capacity ) );
-      return fd;
-    }() ),
-    virtual_address_space_( nullptr, 2 * capacity, PROT_NONE, MAP_SHARED | MAP_ANONYMOUS, -1 ),
-    first_mapping_( virtual_address_space_.addr(),
+    if ( capacity % sysconf( _SC_PAGESIZE ) ) {
+      throw runtime_error( "RingBuffer capacity must be multiple of page size (" +
+                           to_string( sysconf( _SC_PAGESIZE ) ) + ")" );
+    }
+    FileDescriptor fd { CheckSystemCall( "memfd_create", memfd_create( "RingBuffer", 0 ) ) };
+    CheckSystemCall( "ftruncate", ftruncate( fd.fd_num(), 2 * capacity ) );
+    return fd;
+  }() )
+  , virtual_address_space_( nullptr, 2 * capacity, PROT_NONE, MAP_SHARED | MAP_ANONYMOUS, -1 )
+  , first_mapping_( virtual_address_space_.addr(),
                     capacity,
                     PROT_READ | PROT_WRITE,
                     MAP_SHARED | MAP_FIXED,
-                    fd_.fd_num() ),
-    second_mapping_( virtual_address_space_.addr() + capacity,
+                    fd_.fd_num() )
+  , second_mapping_( virtual_address_space_.addr() + capacity,
                      capacity,
                      PROT_READ | PROT_WRITE,
                      MAP_SHARED | MAP_FIXED,
                      fd_.fd_num() )
 {}
+
+std::string_view RingBuffer::writable_region() const
+{
+  return { virtual_address_space_.addr() + next_index_to_write_, capacity() - bytes_stored_ };
+}
 
 simple_string_span RingBuffer::writable_region()
 {

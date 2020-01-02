@@ -6,5 +6,4 @@ SpacesInParentheses: true
 AlwaysBreakAfterReturnType: None
 AlwaysBreakAfterDefinitionReturnType: None
 SpaceBeforeCpp11BracedList: true
-BreakConstructorInitializers: BeforeColon
 ...

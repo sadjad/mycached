@@ -11,8 +11,9 @@ private:
 
 public:
   tagged_error( const std::error_category& category, const std::string_view s_attempt, const int error_code )
-    : system_error( error_code, category ),
-      attempt_and_error_( std::string( s_attempt ) + ": " + std::system_error::what() ), error_code_( error_code )
+    : system_error( error_code, category )
+    , attempt_and_error_( std::string( s_attempt ) + ": " + std::system_error::what() )
+    , error_code_( error_code )
   {}
 
   const char* what() const noexcept override { return attempt_and_error_.c_str(); }

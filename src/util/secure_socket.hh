@@ -28,9 +28,6 @@ class OpenSSL
   static void check_errors( const std::string_view context, const bool must_have_error );
 
 public:
-  OpenSSL();
-  static OpenSSL& global_context();
-
   static void check( const std::string_view context ) { return check_errors( context, false ); }
   static void throw_error( const std::string_view context ) { return check_errors( context, true ); }
 };
@@ -56,6 +53,34 @@ public:
   SSL_handle make_SSL_handle();
 };
 
+class RingBufferBIO : public RingBuffer
+{
+  class Method
+  {
+    struct BIO_METHOD_deleter
+    {
+      void operator()( BIO_METHOD* x ) const { BIO_meth_free( x ); }
+    };
+    std::unique_ptr<BIO_METHOD, BIO_METHOD_deleter> method_;
+
+    Method();
+
+  public:
+    static const BIO_METHOD* method();
+  };
+
+  struct BIO_deleter
+  {
+    void operator()( BIO* x ) const { BIO_vfree( x ); }
+  };
+  std::unique_ptr<BIO, BIO_deleter> bio_;
+
+public:
+  RingBufferBIO( const size_t capacity );
+
+  operator BIO*() { return bio_.get(); }
+};
+
 /* SSL session */
 class SSLSession
 {
@@ -64,15 +89,31 @@ class SSLSession
   SSL_handle ssl_;
 
   RingBuffer outbound_plaintext_ { storage_size };
-  RingBuffer outbound_ciphertext_ { storage_size };
+  RingBufferBIO outbound_ciphertext_ { storage_size };
 
-  RingBuffer inbound_ciphertext_ { storage_size };
+  RingBufferBIO inbound_ciphertext_ { storage_size };
   RingBuffer inbound_plaintext_ { storage_size };
 
   int get_error( const int return_value ) const;
 
+  bool should_read() const;
+  bool should_write() const;
+
+  void do_read();
+  void do_write();
+
+  bool write_waiting_on_read_ {};
+  bool read_waiting_on_write_ {};
+
 public:
   SSLSession( SSL_handle&& ssl );
 
-  void tick();
+  RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
+  RingBuffer& inbound_plaintext() { return inbound_plaintext_; }
+
+  RingBuffer& outbound_ciphertext() { return outbound_ciphertext_; }
+  RingBuffer& inbound_ciphertext() { return inbound_ciphertext_; }
+
+  bool pending_work() const { return should_read() or should_write(); }
+  void do_work();
 };
