@@ -6,6 +6,7 @@
 
 #include "exception.hh"
 #include "ring_buffer.hh"
+#include "socket.hh"
 
 /* global OpenSSL behavior */
 class ssl_error_category : public std::error_category
@@ -53,7 +54,7 @@ public:
   SSL_handle make_SSL_handle();
 };
 
-class RingBufferBIO : public RingBuffer
+class TCPSocketBIO : public TCPSocket
 {
   class Method
   {
@@ -76,7 +77,7 @@ class RingBufferBIO : public RingBuffer
   std::unique_ptr<BIO, BIO_deleter> bio_;
 
 public:
-  RingBufferBIO( const size_t capacity );
+  TCPSocketBIO( TCPSocket&& sock );
 
   operator BIO*() { return bio_.get(); }
 };
@@ -88,32 +89,26 @@ class SSLSession
 
   SSL_handle ssl_;
 
-  RingBuffer outbound_plaintext_ { storage_size };
-  RingBufferBIO outbound_ciphertext_ { storage_size };
+  TCPSocketBIO socket_;
 
-  RingBufferBIO inbound_ciphertext_ { storage_size };
+  RingBuffer outbound_plaintext_ { storage_size };
   RingBuffer inbound_plaintext_ { storage_size };
 
   int get_error( const int return_value ) const;
-
-  bool should_read() const;
-  bool should_write() const;
-
-  void do_read();
-  void do_write();
 
   bool write_waiting_on_read_ {};
   bool read_waiting_on_write_ {};
 
 public:
-  SSLSession( SSL_handle&& ssl );
+  SSLSession( SSL_handle&& ssl, TCPSocket&& sock );
 
   RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
   RingBuffer& inbound_plaintext() { return inbound_plaintext_; }
+  TCPSocket& socket() { return socket_; }
 
-  RingBuffer& outbound_ciphertext() { return outbound_ciphertext_; }
-  RingBuffer& inbound_ciphertext() { return inbound_ciphertext_; }
+  void do_read();
+  void do_write();
 
-  bool pending_work() const { return should_read() or should_write(); }
-  void do_work();
+  bool want_read() const;
+  bool want_write() const;
 };

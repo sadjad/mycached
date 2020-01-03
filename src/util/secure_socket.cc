@@ -55,10 +55,10 @@ SSL_handle SSLContext::make_SSL_handle()
   return ssl;
 }
 
-int ringbuffer_BIO_write( BIO* bio, const char* const buf, const int len )
+int tcpsocket_BIO_write( BIO* bio, const char* const buf, const int len )
 {
-  RingBufferBIO* rb = reinterpret_cast<RingBufferBIO*>( BIO_get_data( bio ) );
-  if ( not rb ) {
+  TCPSocket* sock = reinterpret_cast<TCPSocket*>( BIO_get_data( bio ) );
+  if ( not sock ) {
     throw runtime_error( "BIO_get_data returned nullptr" );
   }
 
@@ -66,9 +66,7 @@ int ringbuffer_BIO_write( BIO* bio, const char* const buf, const int len )
     throw runtime_error( "ringbuffer_BIO_write: len < 0" );
   }
 
-  const string_view data_to_write( buf, len );
-  const size_t bytes_written = rb->writable_region().copy( data_to_write );
-  rb->wrote( bytes_written );
+  const size_t bytes_written = sock->write( { buf, static_cast<size_t>( len ) } );
 
   if ( bytes_written == 0 ) {
     BIO_set_retry_write( bio );
@@ -77,10 +75,10 @@ int ringbuffer_BIO_write( BIO* bio, const char* const buf, const int len )
   return bytes_written;
 }
 
-int ringbuffer_BIO_read( BIO* bio, char* const buf, const int len )
+int tcpsocket_BIO_read( BIO* bio, char* const buf, const int len )
 {
-  RingBufferBIO* rb = reinterpret_cast<RingBufferBIO*>( BIO_get_data( bio ) );
-  if ( not rb ) {
+  TCPSocket* sock = reinterpret_cast<TCPSocket*>( BIO_get_data( bio ) );
+  if ( not sock ) {
     throw runtime_error( "BIO_get_data returned nullptr" );
   }
 
@@ -88,9 +86,7 @@ int ringbuffer_BIO_read( BIO* bio, char* const buf, const int len )
     throw runtime_error( "ringbuffer_BIO_write: len < 0" );
   }
 
-  simple_string_span data_to_read( buf, len );
-  const size_t bytes_read = data_to_read.copy( rb->readable_region() );
-  rb->pop( bytes_read );
+  const size_t bytes_read = sock->read( { buf, static_cast<size_t>( len ) } );
 
   if ( bytes_read == 0 ) {
     BIO_set_retry_read( bio );
@@ -99,7 +95,7 @@ int ringbuffer_BIO_read( BIO* bio, char* const buf, const int len )
   return bytes_read;
 }
 
-long ringbuffer_BIO_ctrl( BIO*, const int cmd, const long, void* const )
+long tcpsocket_BIO_ctrl( BIO*, const int cmd, const long, void* const )
 {
   if ( cmd == BIO_CTRL_FLUSH ) {
     return 1;
@@ -123,44 +119,46 @@ BIO_METHOD* make_method( const string& name )
   return ret;
 }
 
-RingBufferBIO::Method::Method()
-  : method_( make_method( "RingBuffer" ) )
+TCPSocketBIO::Method::Method()
+  : method_( make_method( "TCPSocket" ) )
 {
-  if ( not BIO_meth_set_write( method_.get(), ringbuffer_BIO_write ) ) {
+  if ( not BIO_meth_set_write( method_.get(), tcpsocket_BIO_write ) ) {
     OpenSSL::throw_error( "BIO_meth_set_write" );
   }
 
-  if ( not BIO_meth_set_read( method_.get(), ringbuffer_BIO_read ) ) {
+  if ( not BIO_meth_set_read( method_.get(), tcpsocket_BIO_read ) ) {
     OpenSSL::throw_error( "BIO_meth_set_read" );
   }
 
-  if ( not BIO_meth_set_ctrl( method_.get(), ringbuffer_BIO_ctrl ) ) {
+  if ( not BIO_meth_set_ctrl( method_.get(), tcpsocket_BIO_ctrl ) ) {
     OpenSSL::throw_error( "BIO_meth_set_ctrl" );
   }
 }
 
-const BIO_METHOD* RingBufferBIO::Method::method()
+const BIO_METHOD* TCPSocketBIO::Method::method()
 {
   static Method method;
   return method.method_.get();
 }
 
-RingBufferBIO::RingBufferBIO( const size_t capacity )
-  : RingBuffer( capacity )
+TCPSocketBIO::TCPSocketBIO( TCPSocket&& sock )
+  : TCPSocket( move( sock ) )
   , bio_( BIO_new( Method::method() ) )
 {
   if ( not bio_ ) {
     OpenSSL::throw_error( "BIO_new" );
   }
 
-  BIO_set_data( bio_.get(), this );
+  BIO_set_data( bio_.get(), static_cast<TCPSocket*>( this ) );
+  BIO_up_ref( bio_.get() );
   BIO_up_ref( bio_.get() );
 
-  OpenSSL::check( "RingBufferBIO constructor" );
+  OpenSSL::check( "TCPSocketBIO constructor" );
 }
 
-SSLSession::SSLSession( SSL_handle&& ssl )
+SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
   : ssl_( move( ssl ) )
+  , socket_( move( sock ) )
 {
   if ( not ssl_ ) {
     throw runtime_error( "SecureSocket: constructor must be passed valid SSL structure" );
@@ -170,8 +168,8 @@ SSLSession::SSLSession( SSL_handle&& ssl )
   SSL_set_mode( ssl_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER );
   SSL_set_mode( ssl_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE );
 
-  SSL_set0_rbio( ssl_.get(), inbound_ciphertext_ );
-  SSL_set0_wbio( ssl_.get(), outbound_ciphertext_ );
+  SSL_set0_rbio( ssl_.get(), socket_ );
+  SSL_set0_wbio( ssl_.get(), socket_ );
 
   SSL_set_connect_state( ssl_.get() );
 
@@ -183,55 +181,14 @@ int SSLSession::get_error( const int return_value ) const
   return SSL_get_error( ssl_.get(), return_value );
 }
 
-bool SSLSession::should_read() const
+bool SSLSession::want_read() const
 {
-  return ( not read_waiting_on_write_ ) and ( not inbound_ciphertext_.readable_region().empty() ) and
-         ( not inbound_plaintext_.writable_region().empty() );
+  return ( not read_waiting_on_write_ ) and ( not inbound_plaintext_.writable_region().empty() );
 }
 
-bool SSLSession::should_write() const
+bool SSLSession::want_write() const
 {
-  return ( not write_waiting_on_read_ ) and ( not outbound_plaintext_.readable_region().empty() ) and
-         ( not outbound_ciphertext_.writable_region().empty() );
-}
-
-void SSLSession::do_work()
-{
-  while ( pending_work() ) {
-    bool forward_progress = false;
-
-    for ( unsigned int i = 0; i < 2; i++ ) {
-      if ( should_read() ) {
-        const size_t input_data_before = inbound_ciphertext_.readable_region().size();
-        const size_t output_data_before = inbound_plaintext_.readable_region().size();
-        do_read();
-        const size_t input_data_after = inbound_ciphertext_.readable_region().size();
-        const size_t output_data_after = inbound_plaintext_.readable_region().size();
-
-        if ( ( input_data_after < input_data_before ) or ( output_data_after > output_data_before ) ) {
-          forward_progress = true;
-          write_waiting_on_read_ = false;
-        }
-      }
-
-      if ( should_write() ) {
-        const size_t input_data_before = outbound_plaintext_.readable_region().size();
-        const size_t output_data_before = outbound_ciphertext_.readable_region().size();
-        do_write();
-        const size_t input_data_after = outbound_plaintext_.readable_region().size();
-        const size_t output_data_after = outbound_ciphertext_.readable_region().size();
-
-        if ( ( input_data_after < input_data_before ) or ( output_data_after > output_data_before ) ) {
-          forward_progress = true;
-          read_waiting_on_write_ = false;
-        }
-      }
-    }
-
-    if ( not forward_progress ) {
-      throw runtime_error( "SSL read/write/read/write cycle made no forward progress" );
-    }
-  }
+  return ( not write_waiting_on_read_ ) and ( not outbound_plaintext_.readable_region().empty() );
 }
 
 void SSLSession::do_read()
@@ -239,7 +196,14 @@ void SSLSession::do_read()
   OpenSSL::check( "SSLSession::do_read()" );
 
   simple_string_span target = inbound_plaintext_.writable_region();
+
+  const auto read_count_before = socket_.read_count();
   const int bytes_read = SSL_read( ssl_.get(), target.mutable_data(), target.size() );
+  const auto read_count_after = socket_.read_count();
+
+  if ( read_count_after > read_count_before or bytes_read > 0 ) {
+    write_waiting_on_read_ = false;
+  }
 
   if ( bytes_read > 0 ) {
     inbound_plaintext_.wrote( bytes_read );
@@ -270,7 +234,14 @@ void SSLSession::do_write()
   OpenSSL::check( "SSLSession::do_write()" );
 
   const string_view source = outbound_plaintext_.readable_region();
+
+  const auto write_count_before = socket_.write_count();
   const int bytes_written = SSL_write( ssl_.get(), source.data(), source.size() );
+  const auto write_count_after = socket_.write_count();
+
+  if ( write_count_after > write_count_before or bytes_written > 0 ) {
+    read_waiting_on_write_ = false;
+  }
 
   if ( bytes_written > 0 ) {
     outbound_plaintext_.pop( bytes_written );

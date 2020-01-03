@@ -1,13 +1,5 @@
 #include "eventloop.hh"
-
-#include <cerrno>
-#include <stdexcept>
-#include <system_error>
-#include <utility>
-#include <vector>
-
 #include "exception.hh"
-#include "socket.hh"
 #include "timer.hh"
 
 using namespace std;

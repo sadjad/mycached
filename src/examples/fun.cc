@@ -34,22 +34,22 @@ void program_body()
   timer().stop<t::Nonblock>();
 
   SSLContext ssl_context;
-  SSLSession ssl { ssl_context.make_SSL_handle() };
+  SSLSession ssl { ssl_context.make_SSL_handle(), move( tcp_sock ) };
 
   {
     bool connected = false;
     EventLoop event_loop;
     event_loop.add_rule(
-      tcp_sock,
+      ssl.socket(),
       Direction::Out,
       [&] {
-        tcp_sock.throw_if_error();
-        tcp_sock.peer_address();
+        ssl.socket().throw_if_error();
+        ssl.socket().peer_address();
         connected = true;
       },
       [&] { return not connected; },
       [] {},
-      [&] { tcp_sock.throw_if_error(); } );
+      [&] { ssl.socket().throw_if_error(); } );
 
     while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     }
@@ -64,28 +64,20 @@ void program_body()
     EventLoop event_loop;
 
     event_loop.add_rule(
-      tcp_sock,
+      ssl.socket(),
       Direction::In,
-      [&] { ssl.inbound_ciphertext().wrote( tcp_sock.read( ssl.inbound_ciphertext().writable_region() ) ); },
-      [&] { return !ssl.inbound_ciphertext().writable_region().empty(); },
+      [&] { ssl.do_read(); },
+      [&] { return ssl.want_read(); },
       [] {},
-      [&] { tcp_sock.throw_if_error(); } );
+      [&] { ssl.socket().throw_if_error(); } );
 
     event_loop.add_rule(
-      tcp_sock,
+      ssl.socket(),
       Direction::Out,
-      [&] { ssl.outbound_ciphertext().pop( tcp_sock.write( ssl.outbound_ciphertext().readable_region() ) ); },
-      [&] { return !ssl.outbound_ciphertext().readable_region().empty(); },
+      [&] { ssl.do_write(); },
+      [&] { return ssl.want_write(); },
       [] {},
-      [&] { tcp_sock.throw_if_error(); } );
-
-    /*
-    event_loop.add_rule(
-      standard_input,
-      Direction::In,
-      [&] { ssl.outbound_plaintext().wrote( standard_input.read( ssl.outbound_plaintext().writable_region() ) ); },
-      [&] { return !ssl.outbound_plaintext().writable_region().empty(); } );
-    */
+      [&] { ssl.socket().throw_if_error(); } );
 
     event_loop.add_rule(
       standard_output,
@@ -93,9 +85,8 @@ void program_body()
       [&] { ssl.inbound_plaintext().pop( standard_output.write( ssl.inbound_plaintext().readable_region() ) ); },
       [&] { return !ssl.inbound_plaintext().readable_region().empty(); } );
 
-    do {
-      ssl.do_work();
-    } while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit );
+    while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+    }
   }
 }
 

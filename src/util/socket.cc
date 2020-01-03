@@ -80,7 +80,7 @@ void Socket::connect( const Address& address )
 }
 
 // shut down a socket in the specified way
-//! \param[in] how can be `SHDN_RD`, `SHDN_WR`, or `SHDN_RDWR`; see [shutdown(2)](\ref man2::shutdown)
+//! \param[in] how can be `SHUT_RD`, `SHUT_WR`, or `SHUT_RDWR`; see [shutdown(2)](\ref man2::shutdown)
 void Socket::shutdown( const int how )
 {
   CheckSystemCall( "shutdown", ::shutdown( fd_num(), how ) );

@@ -65,7 +65,15 @@ size_t FileDescriptor::read( simple_string_span buffer )
     throw runtime_error( "FileDescriptor::read: no space to read" );
   }
 
-  const ssize_t bytes_read = CheckSystemCall( "read", ::read( fd_num(), buffer.mutable_data(), buffer.size() ) );
+  const ssize_t bytes_read = ::read( fd_num(), buffer.mutable_data(), buffer.size() );
+  if ( bytes_read < 0 ) {
+    if ( _internal_fd->_non_blocking and ( errno == EAGAIN or errno == EINPROGRESS ) ) {
+      return 0;
+    } else {
+      throw unix_error( "read" );
+    }
+  }
+
   register_read();
 
   if ( bytes_read == 0 ) {

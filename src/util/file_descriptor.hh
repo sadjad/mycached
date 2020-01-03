@@ -51,14 +51,6 @@ protected:
   void set_eof() { _internal_fd->_eof = true; }
   void register_read() { ++_internal_fd->_read_count; }   //!< increment read count
   void register_write() { ++_internal_fd->_write_count; } //!< increment write count
-  void register_service( const bool is_write )
-  {
-    if ( is_write ) {
-      register_write();
-    } else {
-      register_read();
-    }
-  }
 
   int CheckSystemCall( const std::string_view s_attempt, const int return_value ) const
   {
