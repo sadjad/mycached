@@ -55,7 +55,8 @@ void program_body()
     }
   }
 
-  const string query = "GET /~keithw/random HTTP/1.1\r\nHost: cs.stanford.edu\r\nConnection: close\r\n\r\n";
+  const string query = "GET /~keithw/ HTTP/1.1\r\nHost: cs.stanford.edu\r\n\r\nGET /~keithw/test.txt HTTP/1.1\r\nHost: "
+                       "cs.stanford.edu\r\nConnection: close\r\n\r\n";
 
   ssl.outbound_plaintext().wrote( ssl.outbound_plaintext().writable_region().copy( query ) );
 
