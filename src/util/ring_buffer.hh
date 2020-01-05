@@ -47,4 +47,9 @@ public:
 
   std::string_view readable_region() const;
   void pop( const size_t num_bytes );
+
+  void read_from( FileDescriptor& fd ) { push( fd.read( writable_region() ) ); }
+  void write_to( FileDescriptor& fd ) { pop( fd.write( readable_region() ) ); }
+
+  std::string_view read_from( const std::string_view str );
 };

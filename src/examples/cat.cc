@@ -24,16 +24,10 @@ void program_body()
   {
     EventLoop event_loop;
     event_loop.add_rule(
-      in,
-      Direction::In,
-      [&] { buf.push( in.read( buf.writable_region() ) ); },
-      [&] { return !buf.writable_region().empty(); } );
+      in, Direction::In, [&] { buf.read_from( in ); }, [&] { return !buf.writable_region().empty(); } );
 
     event_loop.add_rule(
-      out,
-      Direction::Out,
-      [&] { buf.pop( out.write( buf.readable_region() ) ); },
-      [&] { return !buf.readable_region().empty(); } );
+      out, Direction::Out, [&] { buf.write_to( out ); }, [&] { return !buf.readable_region().empty(); } );
 
     while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     }

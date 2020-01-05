@@ -58,7 +58,9 @@ void program_body()
   const string query = "GET /~keithw/ HTTP/1.1\r\nHost: cs.stanford.edu\r\n\r\nGET /~keithw/test.txt HTTP/1.1\r\nHost: "
                        "cs.stanford.edu\r\nConnection: close\r\n\r\n";
 
-  ssl.outbound_plaintext().push( ssl.outbound_plaintext().writable_region().copy( query ) );
+  if ( not ssl.outbound_plaintext().read_from( query ).empty() ) {
+    throw runtime_error( "no room to send query" );
+  }
 
   {
     EventLoop event_loop;
@@ -82,7 +84,7 @@ void program_body()
     event_loop.add_rule(
       standard_output,
       Direction::Out,
-      [&] { ssl.inbound_plaintext().pop( standard_output.write( ssl.inbound_plaintext().readable_region() ) ); },
+      [&] { ssl.inbound_plaintext().write_to( standard_output ); },
       [&] { return !ssl.inbound_plaintext().readable_region().empty(); } );
 
     while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {

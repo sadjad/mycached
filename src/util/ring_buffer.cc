@@ -90,3 +90,13 @@ void RingBuffer::pop( const size_t num_bytes )
 
   bytes_stored_ -= num_bytes;
 }
+
+string_view RingBuffer::read_from( const string_view str )
+{
+  const size_t bytes_written = writable_region().copy( str );
+  push( bytes_written );
+
+  string_view remaining_portion = str;
+  remaining_portion.remove_prefix( bytes_written );
+  return remaining_portion;
+}
