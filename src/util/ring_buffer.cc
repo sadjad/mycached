@@ -39,7 +39,7 @@ RingBuffer::RingBuffer( const size_t capacity )
                            to_string( sysconf( _SC_PAGESIZE ) ) + ")" );
     }
     FileDescriptor fd { CheckSystemCall( "memfd_create", memfd_create( "RingBuffer", 0 ) ) };
-    CheckSystemCall( "ftruncate", ftruncate( fd.fd_num(), 2 * capacity ) );
+    CheckSystemCall( "ftruncate", ftruncate( fd.fd_num(), capacity ) );
     return fd;
   }() )
   , virtual_address_space_( nullptr, 2 * capacity, PROT_NONE, MAP_SHARED | MAP_ANONYMOUS, -1 )
