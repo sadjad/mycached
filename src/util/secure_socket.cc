@@ -206,7 +206,7 @@ void SSLSession::do_read()
   }
 
   if ( bytes_read > 0 ) {
-    inbound_plaintext_.wrote( bytes_read );
+    inbound_plaintext_.push( bytes_read );
     return;
   }
 

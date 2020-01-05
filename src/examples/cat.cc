@@ -26,7 +26,7 @@ void program_body()
     event_loop.add_rule(
       in,
       Direction::In,
-      [&] { buf.wrote( in.read( buf.writable_region() ) ); },
+      [&] { buf.push( in.read( buf.writable_region() ) ); },
       [&] { return !buf.writable_region().empty(); } );
 
     event_loop.add_rule(

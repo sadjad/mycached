@@ -43,7 +43,7 @@ public:
 
   simple_string_span writable_region();
   std::string_view writable_region() const;
-  void wrote( const size_t num_bytes );
+  void push( const size_t num_bytes );
 
   std::string_view readable_region() const;
   void pop( const size_t num_bytes );

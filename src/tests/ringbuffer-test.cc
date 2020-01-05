@@ -19,7 +19,7 @@ void rb_test( const size_t rb_size, const size_t iteration_count, const size_t b
       ch = random_device()();
     }
 
-    rb.wrote( rb.writable_region().copy( data ) );
+    rb.push( rb.writable_region().copy( data ) );
 
     if ( block == rb_size ) {
       assert( rb.writable_region().size() == 0 );

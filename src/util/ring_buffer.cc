@@ -65,7 +65,7 @@ simple_string_span RingBuffer::writable_region()
   return { virtual_address_space_.addr() + next_index_to_write_, capacity() - bytes_stored_ };
 }
 
-void RingBuffer::wrote( const size_t num_bytes )
+void RingBuffer::push( const size_t num_bytes )
 {
   if ( num_bytes > writable_region().length() ) {
     throw runtime_error( "RingBuffer::wrote exceeded size of writable region" );
