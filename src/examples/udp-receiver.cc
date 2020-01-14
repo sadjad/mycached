@@ -11,16 +11,59 @@
 
 using namespace std;
 
+void split_on_char( const string_view str, const char ch_to_find, vector<string_view>& ret )
+{
+  ret.clear();
+
+  bool in_double_quoted_string = false;
+  unsigned int field_start = 0;
+  for ( unsigned int i = 0; i < str.size(); i++ ) {
+    const char ch = str[i];
+    if ( ch == '"' ) {
+      in_double_quoted_string = !in_double_quoted_string;
+    } else if ( in_double_quoted_string ) {
+      continue;
+    } else if ( ch == ch_to_find ) {
+      ret.emplace_back( str.substr( field_start, i - field_start ) );
+      field_start = i + 1;
+    }
+  }
+
+  ret.emplace_back( str.substr( field_start ) );
+}
+
 void program_body()
 {
   UDPSocket sock;
   sock.bind( { "0", 9090 } );
 
+  optional<Address> client, server;
+
   while ( true ) {
     auto rec = sock.recv();
     cout << "Datagram received from " << rec.source_address.to_string() << ": " << rec.payload << "\n";
 
-    sock.sendto( rec.source_address, "nice to meet you, " + rec.source_address.to_string() );
+    vector<string_view> fields;
+    split_on_char( rec.payload, ' ', fields );
+    if ( fields.size() == 4 and fields.at( 0 ) == "=" ) {
+      if ( fields.at( 1 ) == "server" ) {
+        server.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
+        cout << "Learned server = " << server.value().to_string() << "\n";
+
+        if ( client.has_value() ) {
+          sock.sendto( client.value(), "= server " + server->ip() + to_string( server->port() ) );
+          cout << "Informing client.\n";
+        }
+      } else if ( fields.at( 1 ) == "client" ) {
+        client.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
+        cout << "Learned client = " << client.value().to_string() << "\n";
+
+        if ( server.has_value() ) {
+          sock.sendto( client.value(), "= server " + server->ip() + to_string( server->port() ) );
+          cout << "Informing client of server address.\n";
+        }
+      }
+    }
   }
 }
 

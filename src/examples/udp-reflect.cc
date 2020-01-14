@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 
 #include <unistd.h>
 
@@ -11,48 +12,91 @@
 
 using namespace std;
 
-void program_body( const string& name )
+const uint64_t BILLION { 1'000'000'000 };
+
+void split_on_char( const string_view str, const char ch_to_find, vector<string_view>& ret )
+{
+  ret.clear();
+
+  bool in_double_quoted_string = false;
+  unsigned int field_start = 0;
+  for ( unsigned int i = 0; i < str.size(); i++ ) {
+    const char ch = str[i];
+    if ( ch == '"' ) {
+      in_double_quoted_string = !in_double_quoted_string;
+    } else if ( in_double_quoted_string ) {
+      continue;
+    } else if ( ch == ch_to_find ) {
+      ret.emplace_back( str.substr( field_start, i - field_start ) );
+      field_start = i + 1;
+    }
+  }
+
+  ret.emplace_back( str.substr( field_start ) );
+}
+
+void program_body( const string& id )
 {
   const uint64_t start_time = timestamp_ns();
 
   UDPSocket sock;
   sock.set_blocking( false );
 
-  sock.bind( { "0", 5050 } );
-
   Address trolley { "171.67.76.46", 9090 };
-
-  Address bound_to = sock.local_address();
-
-  bool message_sent = false;
-  bool reply_received = false;
+  optional<Address> server_address;
 
   EventLoop event_loop;
+
+  uint64_t next_announce_time = start_time;
   event_loop.add_rule(
     sock,
     Direction::Out,
     [&] {
-      sock.sendto( trolley, "hello! I am bound to " + bound_to.to_string() );
-      message_sent = true;
+      sock.sendto( trolley, "= " + id );
+      next_announce_time = timestamp_ns() + BILLION;
     },
-    [&] { return message_sent == false; },
+    [&] { return next_announce_time < timestamp_ns(); },
     [] {},
     [&] { sock.throw_if_error(); } );
+
   event_loop.add_rule(
     sock,
     Direction::In,
     [&] {
       auto rec = sock.recv();
-      cout << "Datagram received from " << rec.source_address.to_string() << ": " << rec.payload << "\n";
-      reply_received = true;
+      sock.sendto( trolley,
+                   "INFO " + id + " received datagram from " + rec.source_address.to_string() + ": " + rec.payload );
+
+      if ( id == "client" ) {
+        vector<string_view> fields;
+        split_on_char( rec.payload, ' ', fields );
+        if ( fields.size() == 4 and fields.at( 0 ) == "=" and fields.at( 1 ) == "server" ) {
+          server_address.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
+          sock.sendto( trolley, "INFO " + id + " learned mapping server => " + server_address.value().to_string() );
+        }
+      }
     },
-    [&] { return reply_received == false; },
+    [&] { return true; },
     [] {},
     [&] { sock.throw_if_error(); } );
 
+  uint64_t next_call_time = start_time;
+  if ( id == "client" ) {
+    event_loop.add_rule(
+      sock,
+      Direction::Out,
+      [&] {
+        sock.sendto( server_address.value(), "REQUEST from client" );
+        next_call_time += BILLION / 2;
+      },
+      [&] { return next_call_time < timestamp_ns() and server_address.has_value(); },
+      [] {},
+      [&] { sock.throw_if_error(); } );
+  }
+
   while ( event_loop.wait_next_event( 500 ) != EventLoop::Result::Exit ) {
     if ( timestamp_ns() - start_time > 5ULL * 1000 * 1000 * 1000 ) {
-      cout << "Timeout\n";
+      cout << id << " timeout\n";
       return;
     }
   }
@@ -64,7 +108,7 @@ int main( const int argc, const char* const argv[] )
     timer();
 
     if ( argc != 2 ) {
-      throw runtime_error( "Usage: udp-reflect IDENTITY" );
+      throw runtime_error( "Usage: udp-reflect client|server" );
     }
 
     program_body( argv[1] );
