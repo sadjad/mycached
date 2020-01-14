@@ -45,21 +45,23 @@ void program_body()
 
     vector<string_view> fields;
     split_on_char( rec.payload, ' ', fields );
-    if ( fields.size() == 4 and fields.at( 0 ) == "=" ) {
+    if ( fields.size() == 2 and fields.at( 0 ) == "=" ) {
       if ( fields.at( 1 ) == "server" ) {
-        server.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
+        server.emplace( rec.source_address );
         cout << "Learned server = " << server.value().to_string() << "\n";
 
         if ( client.has_value() ) {
-          sock.sendto( client.value(), "= server " + server->ip() + to_string( server->port() ) );
+          sock.sendto( client.value(), "= server " + server->ip() + " " + to_string( server->port() ) );
           cout << "Informing client.\n";
         }
+
+	sock.sendto( server.value(), "= trolley" );
       } else if ( fields.at( 1 ) == "client" ) {
-        client.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
+        client.emplace( rec.source_address );
         cout << "Learned client = " << client.value().to_string() << "\n";
 
         if ( server.has_value() ) {
-          sock.sendto( client.value(), "= server " + server->ip() + to_string( server->port() ) );
+          sock.sendto( client.value(), "= server " + server->ip() + " " + to_string( server->port() ) );
           cout << "Informing client of server address.\n";
         }
       }

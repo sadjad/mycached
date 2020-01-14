@@ -86,8 +86,9 @@ void program_body( const string& id )
       sock,
       Direction::Out,
       [&] {
+	sock.sendto( trolley, "INFO client sending request to server" );
         sock.sendto( server_address.value(), "REQUEST from client" );
-        next_call_time += BILLION / 2;
+        next_call_time = timestamp_ns() + BILLION / 2;
       },
       [&] { return next_call_time < timestamp_ns() and server_address.has_value(); },
       [] {},
