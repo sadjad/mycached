@@ -19,10 +19,7 @@ void program_body()
   TCPSocket tcp_sock;
   tcp_sock.set_blocking( false );
 
-  FileDescriptor standard_input { STDIN_FILENO };
-  standard_input.set_blocking( false );
-
-  FileDescriptor standard_output { STDOUT_FILENO };
+  FileDescriptor standard_output { CheckSystemCall( "dup", dup( STDOUT_FILENO ) ) };
   standard_output.set_blocking( false );
 
   timer().start<t::DNS>();
@@ -75,10 +72,10 @@ int main()
 {
   try {
     program_body();
-    cerr << timer().summary() << "\n";
+    cout << timer().summary() << "\n";
   } catch ( const exception& e ) {
-    cerr << "Exception: " << e.what() << endl;
-    cerr << timer().summary() << "\n";
+    cout << "Exception: " << e.what() << endl;
+    cout << timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 
