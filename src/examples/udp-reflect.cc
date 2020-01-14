@@ -43,7 +43,9 @@ void program_body( const string& id )
   sock.set_blocking( false );
 
   Address trolley { "171.67.76.46", 9090 };
-  optional<Address> server_address;
+  optional<Address> other_address;
+
+  const string other = ( id == "client" ? "server" : "client" );
 
   EventLoop event_loop;
 
@@ -67,13 +69,11 @@ void program_body( const string& id )
       sock.sendto( trolley,
                    "INFO " + id + " received datagram from " + rec.source_address.to_string() + ": " + rec.payload );
 
-      if ( id == "client" ) {
-        vector<string_view> fields;
-        split_on_char( rec.payload, ' ', fields );
-        if ( fields.size() == 4 and fields.at( 0 ) == "=" and fields.at( 1 ) == "server" ) {
-          server_address.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
-          sock.sendto( trolley, "INFO " + id + " learned mapping server => " + server_address.value().to_string() );
-        }
+      vector<string_view> fields;
+      split_on_char( rec.payload, ' ', fields );
+      if ( fields.size() == 4 and fields.at( 0 ) == "=" and fields.at( 1 ) == other ) {
+        other_address.emplace( string( fields.at( 2 ) ), string( fields.at( 3 ) ) );
+        sock.sendto( trolley, "INFO " + id + " learned mapping other => " + other_address.value().to_string() );
       }
     },
     [&] { return true; },
@@ -81,19 +81,17 @@ void program_body( const string& id )
     [&] { sock.throw_if_error(); } );
 
   uint64_t next_call_time = start_time;
-  if ( id == "client" ) {
-    event_loop.add_rule(
-      sock,
-      Direction::Out,
-      [&] {
-	sock.sendto( trolley, "INFO client sending request to server" );
-        sock.sendto( server_address.value(), "REQUEST from client" );
-        next_call_time = timestamp_ns() + BILLION / 2;
-      },
-      [&] { return next_call_time < timestamp_ns() and server_address.has_value(); },
-      [] {},
-      [&] { sock.throw_if_error(); } );
-  }
+  event_loop.add_rule(
+    sock,
+    Direction::Out,
+    [&] {
+      sock.sendto( trolley, "INFO sending request to other" );
+      sock.sendto( other_address.value(), "REQUEST from " + id );
+      next_call_time = timestamp_ns() + BILLION / 2;
+    },
+    [&] { return next_call_time < timestamp_ns() and other_address.has_value(); },
+    [] {},
+    [&] { sock.throw_if_error(); } );
 
   while ( event_loop.wait_next_event( 500 ) != EventLoop::Result::Exit ) {
     if ( timestamp_ns() - start_time > 5ULL * 1000 * 1000 * 1000 ) {

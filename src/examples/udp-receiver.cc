@@ -49,21 +49,17 @@ void program_body()
       if ( fields.at( 1 ) == "server" ) {
         server.emplace( rec.source_address );
         cout << "Learned server = " << server.value().to_string() << "\n";
-
-        if ( client.has_value() ) {
-          sock.sendto( client.value(), "= server " + server->ip() + " " + to_string( server->port() ) );
-          cout << "Informing client.\n";
-        }
-
-	sock.sendto( server.value(), "= trolley" );
+        sock.sendto( server.value(), "= trolley" );
       } else if ( fields.at( 1 ) == "client" ) {
         client.emplace( rec.source_address );
         cout << "Learned client = " << client.value().to_string() << "\n";
+        sock.sendto( client.value(), "= trolley" );
+      }
 
-        if ( server.has_value() ) {
-          sock.sendto( client.value(), "= server " + server->ip() + " " + to_string( server->port() ) );
-          cout << "Informing client of server address.\n";
-        }
+      if ( client.has_value() and server.has_value() ) {
+        sock.sendto( client.value(), "= server " + server->ip() + " " + to_string( server->port() ) );
+        sock.sendto( server.value(), "= client " + client->ip() + " " + to_string( client->port() ) );
+        cout << "Informing client and server about each other.\n";
       }
     }
   }
