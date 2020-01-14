@@ -6,43 +6,72 @@
 
 #include "eventloop.hh"
 #include "exception.hh"
-#include "ring_buffer.hh"
+#include "socket.hh"
 #include "timer.hh"
 
 using namespace std;
 
-void program_body()
+void program_body( const string& name )
 {
-  FileDescriptor in { STDIN_FILENO };
-  in.set_blocking( false );
+  const uint64_t start_time = timestamp_ns();
 
-  FileDescriptor out { STDOUT_FILENO };
-  out.set_blocking( false );
+  UDPSocket sock;
+  sock.set_blocking( false );
 
-  RingBuffer buf { 1048576 };
+  sock.bind( { "0", 5050 } );
 
-  {
-    EventLoop event_loop;
-    event_loop.add_rule(
-      in, Direction::In, [&] { buf.read_from( in ); }, [&] { return !buf.writable_region().empty(); } );
+  Address trolley { "171.67.76.46", 9090 };
 
-    event_loop.add_rule(
-      out, Direction::Out, [&] { buf.write_to( out ); }, [&] { return !buf.readable_region().empty(); } );
+  Address bound_to = sock.local_address();
 
-    while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+  bool message_sent = false;
+  bool reply_received = false;
+
+  EventLoop event_loop;
+  event_loop.add_rule(
+    sock,
+    Direction::Out,
+    [&] {
+      sock.sendto( trolley, "hello! I am bound to " + bound_to.to_string() );
+      message_sent = true;
+    },
+    [&] { return message_sent == false; },
+    [] {},
+    [&] { sock.throw_if_error(); } );
+  event_loop.add_rule(
+    sock,
+    Direction::In,
+    [&] {
+      auto rec = sock.recv();
+      cout << "Datagram received from " << rec.source_address.to_string() << ": " << rec.payload << "\n";
+      reply_received = true;
+    },
+    [&] { return reply_received == false; },
+    [] {},
+    [&] { sock.throw_if_error(); } );
+
+  while ( event_loop.wait_next_event( 500 ) != EventLoop::Result::Exit ) {
+    if ( timestamp_ns() - start_time > 5ULL * 1000 * 1000 * 1000 ) {
+      cout << "Timeout\n";
+      return;
     }
   }
 }
 
-int main()
+int main( const int argc, const char* const argv[] )
 {
   try {
     timer();
-    program_body();
-    cerr << timer().summary() << "\n";
+
+    if ( argc != 2 ) {
+      throw runtime_error( "Usage: udp-reflect IDENTITY" );
+    }
+
+    program_body( argv[1] );
+    cout << timer().summary() << "\n";
   } catch ( const exception& e ) {
-    cerr << "Exception: " << e.what() << endl;
-    cerr << timer().summary() << "\n";
+    cout << "Exception: " << e.what() << endl;
+    cout << timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 
