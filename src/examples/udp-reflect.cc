@@ -5,6 +5,7 @@
 
 #include <unistd.h>
 
+#include "build-id.hh"
 #include "eventloop.hh"
 #include "exception.hh"
 #include "socket.hh"
@@ -38,6 +39,8 @@ void split_on_char( const string_view str, const char ch_to_find, vector<string_
 void program_body( const string& id )
 {
   const uint64_t start_time = timestamp_ns();
+
+  cerr << "Build ID: " << build_id_hex() << "\n";
 
   UDPSocket sock;
   sock.set_blocking( false );
