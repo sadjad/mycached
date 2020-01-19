@@ -53,6 +53,9 @@ public:
   HTTPMessage() {}
   virtual ~HTTPMessage() {}
 
+  /* convenience constructor */
+  HTTPMessage( std::string&& first_line, std::vector<HTTPHeader>&& headers, std::string&& body );
+
   /* methods called by an external parser */
   void set_first_line( const std::string_view str );
   void add_header( const std::string_view str );

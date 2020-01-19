@@ -175,3 +175,11 @@ std::string HTTPMessage::serialize() const
 
   return ret;
 }
+
+/* convenience constructor */
+HTTPMessage::HTTPMessage( string&& first_line, vector<HTTPHeader>&& headers, string&& body )
+  : first_line_( std::move( first_line ) )
+  , headers_( std::move( headers ) )
+  , body_( std::move( body ) )
+  , state_( COMPLETE )
+{}

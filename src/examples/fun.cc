@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -38,26 +39,12 @@ void program_body()
   HTTPResponseParser responses;
 
   queue<HTTPRequest> requests;
-  requests.emplace();
-  requests.back().set_first_line( "GET /~keithw/ HTTP/1.1" );
-  requests.back().add_header( { "Host", "cs.stanford.edu" } );
-  requests.back().done_with_headers();
-  requests.back().read_in_body( "" );
+  requests.push( { "GET /~keithw/ HTTP/1.1", { { "Host", "cs.stanford.edu" } }, "" } );
   responses.new_request_arrived( requests.back() );
 
-  requests.emplace();
-  requests.back().set_first_line( "GET /~keithw/nonexist HTTP/1.1" );
-  requests.back().add_header( { "Host", "cs.stanford.edu" } );
-  requests.back().add_header( { "Connection", "close" } );
-  requests.back().done_with_headers();
-  requests.back().read_in_body( "" );
+  requests.push(
+    { "GET /~keithw/nonexist HTTP/1.1", { { "Host", "cs.stanford.edu" }, { "Connection", "close" } }, "" } );
   responses.new_request_arrived( requests.back() );
-
-  string text_request = requests.front().serialize();
-  requests.pop();
-  text_request.append( requests.front().serialize() );
-
-  string_view text_request_view { text_request };
 
   EventLoop event_loop;
 
@@ -77,9 +64,20 @@ void program_body()
     [] {},
     [&] { ssl.socket().throw_if_error(); } );
 
+  string current_request;
+  string_view current_request_unsent;
+
   do {
-    if ( ( not text_request_view.empty() ) and ( not ssl.outbound_plaintext().writable_region().empty() ) ) {
-      text_request_view.remove_prefix( ssl.outbound_plaintext().read_from( text_request_view ) );
+    while ( ( not ssl.outbound_plaintext().writable_region().empty() ) and
+            ( ( not current_request_unsent.empty() ) or ( not requests.empty() ) ) ) {
+      if ( current_request_unsent.empty() ) {
+        assert( not requests.empty() );
+        current_request = requests.front().serialize();
+        requests.pop();
+        current_request_unsent = current_request;
+      }
+
+      current_request_unsent.remove_prefix( ssl.outbound_plaintext().read_from( current_request_unsent ) );
     }
 
     if ( ( not ssl.inbound_plaintext().readable_region().empty() ) and ( responses.can_parse() ) ) {
