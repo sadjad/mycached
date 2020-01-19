@@ -76,7 +76,7 @@ public:
   const std::string_view get_header_value( const std::string_view header_name ) const;
 
   /* serialize the request or response as one string */
-  std::string str() const;
+  std::string serialize() const;
 
   /* compare two strings for (case-insensitive) equality,
      in ASCII without sensitivity to locale */

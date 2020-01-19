@@ -21,7 +21,6 @@ private:
     bool have_complete_line() const;
 
     std::string_view get_line();
-    void pop_line();
 
     void pop_bytes( const size_t n );
 
@@ -30,6 +29,8 @@ private:
     size_t append( const std::string_view str ) { return buffer_.read_from( str ); }
 
     const std::string_view str() const { return buffer_.readable_region(); }
+
+    bool has_room_to_write() const { return not buffer_.writable_region().empty(); }
   };
 
   /* bytes that haven't been parsed yet */
@@ -57,6 +58,8 @@ public:
   /* returns number of bytes accepted */
   size_t parse( const std::string_view buf );
 
+  bool can_parse() const { return buffer_.has_room_to_write(); }
+
   /* getters */
   bool empty() const { return complete_messages_.empty(); }
   const MessageType& front() const { return complete_messages_.front(); }
@@ -79,7 +82,6 @@ std::string_view HTTPMessageSequence<MessageType>::InternalBuffer::get_line()
   assert( first_line_ending != std::string::npos );
 
   std::string_view first_line( buffer_.readable_region().substr( 0, first_line_ending ) );
-  //  pop_bytes( first_line_ending + CRLF.size() );
 
   return first_line;
 }
@@ -103,7 +105,8 @@ bool HTTPMessageSequence<MessageType>::parsing_step()
       /* supply status line to request/response initialization routine */
       initialize_new_message();
 
-      message_in_progress_.set_first_line( buffer_.get_and_pop_line() );
+      message_in_progress_.set_first_line( buffer_.get_line() );
+      buffer_.pop_bytes( message_in_progress_.first_line().size() + 2 );
 
       return true;
     case HEADERS_PENDING:
@@ -114,12 +117,13 @@ bool HTTPMessageSequence<MessageType>::parsing_step()
 
       /* is line blank? */
       {
-        std::string line( buffer_.get_and_pop_line() );
+        std::string_view line { buffer_.get_line() };
         if ( line.empty() ) {
           message_in_progress_.done_with_headers();
         } else {
           message_in_progress_.add_header( line );
         }
+        buffer_.pop_bytes( line.size() + 2 );
       }
       return true;
 

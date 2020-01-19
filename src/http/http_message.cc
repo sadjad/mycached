@@ -155,7 +155,7 @@ const string_view HTTPMessage::get_header_value( const string_view header_name )
 }
 
 /* serialize the request or response as one string */
-std::string HTTPMessage::str() const
+std::string HTTPMessage::serialize() const
 {
   assert( state_ == COMPLETE );
 

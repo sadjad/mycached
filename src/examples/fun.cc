@@ -35,12 +35,15 @@ void program_body()
   SSLContext ssl_context;
   SSLSession ssl { ssl_context.make_SSL_handle(), move( tcp_sock ) };
 
+  HTTPResponseParser responses;
+
   queue<HTTPRequest> requests;
   requests.emplace();
   requests.back().set_first_line( "GET /~keithw/ HTTP/1.1" );
   requests.back().add_header( { "Host", "cs.stanford.edu" } );
   requests.back().done_with_headers();
   requests.back().read_in_body( "" );
+  responses.new_request_arrived( requests.back() );
 
   requests.emplace();
   requests.back().set_first_line( "GET /~keithw/nonexist HTTP/1.1" );
@@ -48,14 +51,13 @@ void program_body()
   requests.back().add_header( { "Connection", "close" } );
   requests.back().done_with_headers();
   requests.back().read_in_body( "" );
+  responses.new_request_arrived( requests.back() );
 
-  string text_request = requests.front().str();
+  string text_request = requests.front().serialize();
   requests.pop();
-  text_request.append( requests.front().str() );
+  text_request.append( requests.front().serialize() );
 
   string_view text_request_view { text_request };
-
-  HTTPResponseParser responses;
 
   EventLoop event_loop;
 
@@ -75,15 +77,18 @@ void program_body()
     [] {},
     [&] { ssl.socket().throw_if_error(); } );
 
-  event_loop.add_rule(
-    standard_output,
-    Direction::Out,
-    [&] { ssl.inbound_plaintext().write_to( standard_output ); },
-    [&] { return !ssl.inbound_plaintext().readable_region().empty(); } );
-
   do {
     if ( ( not text_request_view.empty() ) and ( not ssl.outbound_plaintext().writable_region().empty() ) ) {
       text_request_view.remove_prefix( ssl.outbound_plaintext().read_from( text_request_view ) );
+    }
+
+    if ( ( not ssl.inbound_plaintext().readable_region().empty() ) and ( responses.can_parse() ) ) {
+      ssl.inbound_plaintext().pop( responses.parse( ssl.inbound_plaintext().readable_region() ) );
+    }
+
+    while ( not responses.empty() ) {
+      cerr << "Response received: " << responses.front().first_line() << "\n";
+      responses.pop();
     }
   } while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit );
 }
