@@ -103,6 +103,20 @@ size_t FileDescriptor::write( const string_view buffer )
   return bytes_written;
 }
 
+size_t FileDescriptor::write( const vector<string_view>& buffers )
+{
+  vector<iovec> iovecs;
+  iovecs.reserve( buffers.size() );
+  for ( const auto x : buffers ) {
+    iovecs.push_back( { const_cast<char*>( x.data() ), x.size() } );
+  }
+
+  const ssize_t bytes_written = CheckSystemCall( "writev", ::writev( fd_num(), iovecs.data(), iovecs.size() ) );
+  register_write();
+
+  return bytes_written;
+}
+
 void FileDescriptor::set_blocking( const bool blocking )
 {
   int flags = CheckSystemCall( "fcntl", fcntl( fd_num(), F_GETFL ) );

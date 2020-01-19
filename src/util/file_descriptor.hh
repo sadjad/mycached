@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <limits>
 #include <memory>
+#include <vector>
 
 #include "simple_string_span.hh"
 
@@ -64,13 +65,15 @@ public:
   //! Free the std::shared_ptr; the FDWrapper destructor calls close() when the refcount goes to zero.
   ~FileDescriptor() = default;
 
-  //! Read into `str`
+  //! Read into `buffer`
   //! \returns number of bytes read
-  size_t read( const simple_string_span buffer );
+  size_t read( simple_string_span buffer );
 
   //! Attempt to write a buffer
   //! \returns number of bytes written
   size_t write( const std::string_view buffer );
+
+  size_t write( const std::vector<std::string_view>& buffers );
 
   //! Close the underlying file descriptor
   void close() { _internal_fd->close(); }

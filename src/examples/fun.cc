@@ -7,6 +7,8 @@
 #include "address.hh"
 #include "eventloop.hh"
 #include "exception.hh"
+#include "http_request_parser.hh"
+#include "http_response_parser.hh"
 #include "secure_socket.hh"
 #include "socket.hh"
 #include "timer.hh"
@@ -33,12 +35,27 @@ void program_body()
   SSLContext ssl_context;
   SSLSession ssl { ssl_context.make_SSL_handle(), move( tcp_sock ) };
 
-  const string query = "GET /~keithw/ HTTP/1.1\r\nHost: cs.stanford.edu\r\n\r\nGET /~keithw/test.txt HTTP/1.1\r\nHost: "
-                       "cs.stanford.edu\r\nConnection: close\r\n\r\n";
+  queue<HTTPRequest> requests;
+  requests.emplace();
+  requests.back().set_first_line( "GET /~keithw/ HTTP/1.1" );
+  requests.back().add_header( { "Host", "cs.stanford.edu" } );
+  requests.back().done_with_headers();
+  requests.back().read_in_body( "" );
 
-  if ( not ssl.outbound_plaintext().read_from( query ).empty() ) {
-    throw runtime_error( "no room to write query" );
-  }
+  requests.emplace();
+  requests.back().set_first_line( "GET /~keithw/nonexist HTTP/1.1" );
+  requests.back().add_header( { "Host", "cs.stanford.edu" } );
+  requests.back().add_header( { "Connection", "close" } );
+  requests.back().done_with_headers();
+  requests.back().read_in_body( "" );
+
+  string text_request = requests.front().str();
+  requests.pop();
+  text_request.append( requests.front().str() );
+
+  string_view text_request_view { text_request };
+
+  HTTPResponseParser responses;
 
   EventLoop event_loop;
 
@@ -64,8 +81,11 @@ void program_body()
     [&] { ssl.inbound_plaintext().write_to( standard_output ); },
     [&] { return !ssl.inbound_plaintext().readable_region().empty(); } );
 
-  while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
-  }
+  do {
+    if ( ( not text_request_view.empty() ) and ( not ssl.outbound_plaintext().writable_region().empty() ) ) {
+      text_request_view.remove_prefix( ssl.outbound_plaintext().read_from( text_request_view ) );
+    }
+  } while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit );
 }
 
 int main()

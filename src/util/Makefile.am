@@ -11,4 +11,6 @@ libmushutil_a_SOURCES = exception.hh \
 	ring_buffer.hh ring_buffer.cc \
 	secure_socket.hh secure_socket.cc \
 	timer.hh timer.cc \
-	build-id.hh build-id.cc
+	build-id.hh build-id.cc \
+	split.hh split.cc \
+	convert.hh convert.cc

@@ -41,6 +41,7 @@ AC_CONFIG_FILES([
     Makefile
     src/Makefile
     src/util/Makefile
+    src/http/Makefile
     src/examples/Makefile
     src/tests/Makefile
 ])
