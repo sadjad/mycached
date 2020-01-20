@@ -35,8 +35,8 @@ MMap_Region::~MMap_Region()
 RingBuffer::RingBuffer( const size_t capacity )
   : fd_( [&] {
     if ( capacity % sysconf( _SC_PAGESIZE ) ) {
-      throw runtime_error( "RingBuffer capacity must be multiple of page size (" +
-                           to_string( sysconf( _SC_PAGESIZE ) ) + ")" );
+      throw runtime_error( "RingBuffer capacity must be multiple of page size (" + to_string( sysconf( _SC_PAGESIZE ) )
+                           + ")" );
     }
     FileDescriptor fd { CheckSystemCall( "memfd_create", memfd_create( "RingBuffer", 0 ) ) };
     CheckSystemCall( "ftruncate", ftruncate( fd.fd_num(), capacity ) );

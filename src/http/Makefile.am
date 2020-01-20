@@ -12,4 +12,5 @@ libmushhttp_a_SOURCES = body_parser.hh \
 	http_request_parser.hh \
 	http_response.cc http_response.hh \
 	http_response_parser.cc http_response_parser.hh \
-	mime_type.cc mime_type.hh
+	mime_type.cc mime_type.hh \
+	http_client.hh

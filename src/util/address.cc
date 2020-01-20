@@ -107,8 +107,8 @@ pair<string, uint16_t> Address::ip_port() const
   array<char, NI_MAXHOST> ip {};
   array<char, NI_MAXSERV> port {};
 
-  const int gni_ret =
-    getnameinfo( _address, _size, ip.data(), ip.size(), port.data(), port.size(), NI_NUMERICHOST | NI_NUMERICSERV );
+  const int gni_ret
+    = getnameinfo( _address, _size, ip.data(), ip.size(), port.data(), port.size(), NI_NUMERICHOST | NI_NUMERICSERV );
   if ( gni_ret != 0 ) {
     throw tagged_error( gai_error_category(), "getnameinfo", gni_ret );
   }

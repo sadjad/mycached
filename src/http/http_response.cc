@@ -56,8 +56,8 @@ void HTTPResponse::calculate_expected_body_size()
     return;
   }
 
-  if ( has_header( "Content-Type" ) and
-       equivalent_strings( MIMEType( get_header_value( "Content-Type" ) ).type(), "multipart/byteranges" ) ) {
+  if ( has_header( "Content-Type" )
+       and equivalent_strings( MIMEType( get_header_value( "Content-Type" ) ).type(), "multipart/byteranges" ) ) {
 
     /* Rule 4 */
     set_expected_body_size( false );
