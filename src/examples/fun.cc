@@ -53,7 +53,7 @@ void program_body()
       http.write( ssl.outbound_plaintext() );
     }
 
-    if ( ( not ssl.inbound_plaintext().readable_region().empty() ) and ( http.can_parse() ) ) {
+    if ( ( not ssl.inbound_plaintext().readable_region().empty() ) ) {
       http.read( ssl.inbound_plaintext() );
     }
 

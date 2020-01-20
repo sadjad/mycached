@@ -64,10 +64,7 @@ public:
     }
   }
 
-  void read( RingBuffer& in ) { in.pop( parse_response( in.readable_region() ) ); }
-
-  size_t parse_response( const std::string_view buf ) { return responses_.parse( buf ); }
-  bool can_parse() const { return responses_.can_parse(); }
+  void read( RingBuffer& in ) { return responses_.parse( in ); }
   bool responses_empty() const { return responses_.empty(); }
   const HTTPResponse& responses_front() const { return responses_.front(); }
   void pop_response() { return responses_.pop(); }

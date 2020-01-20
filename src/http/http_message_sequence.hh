@@ -10,38 +10,26 @@
 template<class MessageType>
 class HTTPMessageSequence
 {
-private:
-  class InternalBuffer
+  static bool have_complete_line( const RingBuffer& rb )
   {
-  private:
-    static constexpr size_t buffer_size = 1048576;
-    RingBuffer buffer_ { buffer_size };
+    size_t first_line_ending = rb.readable_region().find( CRLF );
+    return first_line_ending != std::string::npos;
+  }
 
-  public:
-    bool have_complete_line() const;
+  static std::string_view get_line( const RingBuffer& rb )
+  {
+    size_t first_line_ending = rb.readable_region().find( CRLF );
+    assert( first_line_ending != std::string::npos );
 
-    std::string_view get_line();
-
-    void pop_bytes( const size_t n );
-
-    bool empty() const { return buffer_.readable_region().empty(); }
-
-    size_t append( const std::string_view str ) { return buffer_.write( str ); }
-
-    const std::string_view str() const { return buffer_.readable_region(); }
-
-    bool has_room_to_write() const { return not buffer_.writable_region().empty(); }
-  };
-
-  /* bytes that haven't been parsed yet */
-  InternalBuffer buffer_ {};
+    return rb.readable_region().substr( 0, first_line_ending );
+  }
 
   /* complete messages ready to go */
   std::queue<MessageType> complete_messages_ {};
 
   /* one loop through the parser */
   /* returns whether to continue */
-  bool parsing_step();
+  bool parsing_step( RingBuffer& rb );
 
   /* what to do to create a new message.
      must be implemented by subclass */
@@ -55,10 +43,16 @@ public:
   HTTPMessageSequence() {}
   virtual ~HTTPMessageSequence() {}
 
-  /* returns number of bytes accepted */
-  size_t parse( const std::string_view buf );
+  void parse( RingBuffer& rb )
+  {
+    if ( rb.readable_region().empty() ) { /* EOF */
+      message_in_progress_.eof();
+    }
 
-  bool can_parse() const { return buffer_.has_room_to_write(); }
+    /* parse as much as we can */
+    while ( parsing_step( rb ) ) {
+    }
+  }
 
   /* getters */
   bool empty() const { return complete_messages_.empty(); }
@@ -69,68 +63,44 @@ public:
 };
 
 template<class MessageType>
-bool HTTPMessageSequence<MessageType>::InternalBuffer::have_complete_line() const
-{
-  size_t first_line_ending = buffer_.readable_region().find( CRLF );
-  return first_line_ending != std::string::npos;
-}
-
-template<class MessageType>
-std::string_view HTTPMessageSequence<MessageType>::InternalBuffer::get_line()
-{
-  size_t first_line_ending = buffer_.readable_region().find( CRLF );
-  assert( first_line_ending != std::string::npos );
-
-  std::string_view first_line( buffer_.readable_region().substr( 0, first_line_ending ) );
-
-  return first_line;
-}
-
-template<class MessageType>
-void HTTPMessageSequence<MessageType>::InternalBuffer::pop_bytes( const size_t num )
-{
-  buffer_.pop( num );
-}
-
-template<class MessageType>
-bool HTTPMessageSequence<MessageType>::parsing_step()
+bool HTTPMessageSequence<MessageType>::parsing_step( RingBuffer& rb )
 {
   switch ( message_in_progress_.state() ) {
     case FIRST_LINE_PENDING:
       /* do we have a complete line? */
-      if ( not buffer_.have_complete_line() ) {
+      if ( not have_complete_line( rb ) ) {
         return false;
       }
 
       /* supply status line to request/response initialization routine */
       initialize_new_message();
 
-      message_in_progress_.set_first_line( buffer_.get_line() );
-      buffer_.pop_bytes( message_in_progress_.first_line().size() + 2 );
+      message_in_progress_.set_first_line( get_line( rb ) );
+      rb.pop( message_in_progress_.first_line().size() + 2 );
 
       return true;
     case HEADERS_PENDING:
       /* do we have a complete line? */
-      if ( not buffer_.have_complete_line() ) {
+      if ( not have_complete_line( rb ) ) {
         return false;
       }
 
       /* is line blank? */
       {
-        std::string_view line { buffer_.get_line() };
+        std::string_view line { get_line( rb ) };
         if ( line.empty() ) {
           message_in_progress_.done_with_headers();
         } else {
           message_in_progress_.add_header( line );
         }
-        buffer_.pop_bytes( line.size() + 2 );
+        rb.pop( line.size() + 2 );
       }
       return true;
 
     case BODY_PENDING: {
-      size_t bytes_read = message_in_progress_.read_in_body( buffer_.str() );
-      assert( bytes_read == buffer_.str().size() or message_in_progress_.state() == COMPLETE );
-      buffer_.pop_bytes( bytes_read );
+      size_t bytes_read = message_in_progress_.read_in_body( rb.readable_region() );
+      assert( bytes_read == rb.readable_region().size() or message_in_progress_.state() == COMPLETE );
+      rb.pop( bytes_read );
     }
       return message_in_progress_.state() == COMPLETE;
 
@@ -142,21 +112,4 @@ bool HTTPMessageSequence<MessageType>::parsing_step()
 
   assert( false );
   return false;
-}
-
-template<class MessageType>
-size_t HTTPMessageSequence<MessageType>::parse( const std::string_view buf )
-{
-  if ( buf.empty() ) { /* EOF */
-    message_in_progress_.eof();
-  }
-
-  /* append buf to internal buffer */
-  const size_t ret = buffer_.append( buf );
-
-  /* parse as much as we can */
-  while ( parsing_step() ) {
-  }
-
-  return ret;
 }
