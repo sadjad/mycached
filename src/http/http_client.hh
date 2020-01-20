@@ -64,6 +64,8 @@ public:
     }
   }
 
+  void read( RingBuffer& in ) { in.pop( parse_response( in.readable_region() ) ); }
+
   size_t parse_response( const std::string_view buf ) { return responses_.parse( buf ); }
   bool can_parse() const { return responses_.can_parse(); }
   bool responses_empty() const { return responses_.empty(); }

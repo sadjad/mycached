@@ -54,7 +54,7 @@ void program_body()
     }
 
     if ( ( not ssl.inbound_plaintext().readable_region().empty() ) and ( http.can_parse() ) ) {
-      ssl.inbound_plaintext().pop( http.parse_response( ssl.inbound_plaintext().readable_region() ) );
+      http.read( ssl.inbound_plaintext() );
     }
 
     while ( not http.responses_empty() ) {
