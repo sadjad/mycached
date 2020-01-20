@@ -8,11 +8,10 @@ class HTTPResponseParser : public HTTPMessageSequence<HTTPResponse>
 {
 private:
   /* Need this to handle RFC 2616 section 4.4 rule 1 */
-  std::queue<HTTPRequest> requests_ {};
+  std::queue<bool> requests_are_head_ {};
 
   void initialize_new_message() override;
 
 public:
-  void new_request_arrived( const HTTPRequest& request );
-  unsigned int pending_requests() const { return requests_.size(); }
+  void new_request_arrived( const HTTPRequest& request ) { requests_are_head_.push( request.is_head() ); }
 };

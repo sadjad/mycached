@@ -29,7 +29,7 @@ void HTTPResponse::calculate_expected_body_size()
 
   /* implement rules of RFC 2616 section 4.4 ("Message Length") */
 
-  if ( status_code().at( 0 ) == '1' or status_code() == "204" or status_code() == "304" or request_.is_head() ) {
+  if ( status_code().at( 0 ) == '1' or status_code() == "204" or status_code() == "304" or request_is_head_ ) {
     /* Rule 1: size known to be zero */
     set_expected_body_size( true, 0 );
     return;
@@ -100,9 +100,9 @@ bool HTTPResponse::eof_in_body() const
   }
 }
 
-void HTTPResponse::set_request( const HTTPRequest& request )
+void HTTPResponse::set_request_is_head( const bool request_is_head )
 {
   assert( state_ == FIRST_LINE_PENDING );
 
-  request_ = request;
+  request_is_head_ = request_is_head;
 }

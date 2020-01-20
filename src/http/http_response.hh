@@ -9,7 +9,7 @@
 class HTTPResponse : public HTTPMessage
 {
 private:
-  HTTPRequest request_ {};
+  bool request_is_head_ {};
 
   /* required methods */
   void calculate_expected_body_size() override;
@@ -19,8 +19,7 @@ private:
   std::unique_ptr<BodyParser> body_parser_ { nullptr };
 
 public:
-  void set_request( const HTTPRequest& request );
-  const HTTPRequest& request() const { return request_; }
+  void set_request_is_head( const bool request_is_head );
 
   std::string_view status_code() const;
 

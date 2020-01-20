@@ -8,16 +8,11 @@ using namespace std;
 void HTTPResponseParser::initialize_new_message()
 {
   /* do we have a request that we can match this response up with? */
-  if ( requests_.empty() ) {
+  if ( requests_are_head_.empty() ) {
     throw runtime_error( "HTTPResponseParser: response without matching request" );
   }
 
-  message_in_progress_.set_request( requests_.front() );
+  message_in_progress_.set_request_is_head( requests_are_head_.front() );
 
-  requests_.pop();
-}
-
-void HTTPResponseParser::new_request_arrived( const HTTPRequest& request )
-{
-  requests_.push( request );
+  requests_are_head_.pop();
 }
