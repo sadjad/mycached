@@ -30,10 +30,8 @@ void HTTPResponse::calculate_expected_body_size()
   /* implement rules of RFC 2616 section 4.4 ("Message Length") */
 
   if ( status_code().at( 0 ) == '1' or status_code() == "204" or status_code() == "304" or request_.is_head() ) {
-
     /* Rule 1: size known to be zero */
     set_expected_body_size( true, 0 );
-
     return;
   }
 
@@ -53,7 +51,6 @@ void HTTPResponse::calculate_expected_body_size()
   }
 
   if ( ( not has_header( "Transfer-Encoding" ) ) and has_header( "Content-Length" ) ) {
-
     /* Rule 3: content-length header present to specify size */
     set_expected_body_size( true, to_uint64( get_header_value( "Content-Length" ) ) );
     return;

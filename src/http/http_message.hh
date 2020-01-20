@@ -78,8 +78,8 @@ public:
   bool has_header( const std::string_view header_name ) const;
   const std::string_view get_header_value( const std::string_view header_name ) const;
 
-  /* serialize the request or response as one string */
-  std::string serialize() const;
+  /* serialize the first line and headers */
+  void serialize_headers( std::string& output ) const;
 
   /* compare two strings for (case-insensitive) equality,
      in ASCII without sensitivity to locale */

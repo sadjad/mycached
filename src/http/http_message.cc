@@ -154,26 +154,21 @@ const string_view HTTPMessage::get_header_value( const string_view header_name )
   throw runtime_error( "HTTPMessage header not found: " + string( header_name ) );
 }
 
-/* serialize the request or response as one string */
-std::string HTTPMessage::serialize() const
+/* serialize the first line and headers */
+void HTTPMessage::serialize_headers( std::string& output ) const
 {
   assert( state_ == COMPLETE );
 
   /* start with first line */
-  string ret( first_line_ + CRLF );
+  output = first_line_ + CRLF;
 
   /* iterate through headers and add "key: value\r\n" to request */
   for ( const auto& header : headers_ ) {
-    ret.append( header.str() + CRLF );
+    output.append( header.str() + CRLF );
   }
 
   /* blank line between headers and body */
-  ret.append( CRLF );
-
-  /* add body to request */
-  ret.append( body_ );
-
-  return ret;
+  output.append( CRLF );
 }
 
 /* convenience constructor */

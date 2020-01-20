@@ -36,15 +36,10 @@ void program_body()
   SSLContext ssl_context;
   SSLSession ssl { ssl_context.make_SSL_handle(), move( tcp_sock ) };
 
-  HTTPResponseParser responses;
-
   queue<HTTPRequest> requests;
   requests.push( { "GET /~keithw/ HTTP/1.1", { { "Host", "cs.stanford.edu" } }, "" } );
-  responses.new_request_arrived( requests.back() );
-
-  requests.push(
-    { "GET /~keithw/nonexist HTTP/1.1", { { "Host", "cs.stanford.edu" }, { "Connection", "close" } }, "" } );
-  responses.new_request_arrived( requests.back() );
+  requests.push( { "GET /~keithw/nonexist HTTP/1.1", { { "Host", "cs.stanford.edu" } }, "" } );
+  requests.push( { "GET /~keithw/ HTTP/1.1", { { "Host", "cs.stanford.edu" }, { "Connection", "close" } }, "" } );
 
   EventLoop event_loop;
 
@@ -64,20 +59,32 @@ void program_body()
     [] {},
     [&] { ssl.socket().throw_if_error(); } );
 
-  string current_request;
-  string_view current_request_unsent;
+  HTTPResponseParser responses;
+
+  string current_request_headers;
+  string_view current_request_unsent_headers;
+  string_view current_request_unsent_body;
 
   do {
     while ( ( not ssl.outbound_plaintext().writable_region().empty() ) and
-            ( ( not current_request_unsent.empty() ) or ( not requests.empty() ) ) ) {
-      if ( current_request_unsent.empty() ) {
-        assert( not requests.empty() );
-        current_request = requests.front().serialize();
-        requests.pop();
-        current_request_unsent = current_request;
+            ( ( not current_request_unsent_headers.empty() ) or ( not current_request_unsent_body.empty() ) or
+              ( not requests.empty() ) ) ) {
+      if ( not current_request_unsent_headers.empty() ) {
+        current_request_unsent_headers.remove_prefix(
+          ssl.outbound_plaintext().read_from( current_request_unsent_headers ) );
+      } else if ( not current_request_unsent_body.empty() ) {
+        current_request_unsent_body.remove_prefix( ssl.outbound_plaintext().read_from( current_request_unsent_body ) );
+      } else if ( not requests.empty() ) {
+        requests.front().serialize_headers( current_request_headers );
+        current_request_unsent_headers = current_request_headers;
+        current_request_unsent_body = requests.front().body();
+        responses.new_request_arrived( requests.front() );
+        cerr << "Making request: " << requests.front().first_line() << "\n";
       }
 
-      current_request_unsent.remove_prefix( ssl.outbound_plaintext().read_from( current_request_unsent ) );
+      if ( current_request_unsent_headers.empty() and current_request_unsent_body.empty() ) {
+        requests.pop();
+      }
     }
 
     if ( ( not ssl.inbound_plaintext().readable_region().empty() ) and ( responses.can_parse() ) ) {
