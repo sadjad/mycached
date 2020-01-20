@@ -51,5 +51,6 @@ public:
   void read_from( FileDescriptor& fd ) { push( fd.read( writable_region() ) ); }
   void write_to( FileDescriptor& fd ) { pop( fd.write( readable_region() ) ); }
 
-  size_t read_from( const std::string_view str );
+  size_t write( const std::string_view str );
+  void read_from( std::string_view& str );
 };

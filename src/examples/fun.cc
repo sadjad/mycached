@@ -70,10 +70,9 @@ void program_body()
             ( ( not current_request_unsent_headers.empty() ) or ( not current_request_unsent_body.empty() ) or
               ( not requests.empty() ) ) ) {
       if ( not current_request_unsent_headers.empty() ) {
-        current_request_unsent_headers.remove_prefix(
-          ssl.outbound_plaintext().read_from( current_request_unsent_headers ) );
+        ssl.outbound_plaintext().read_from( current_request_unsent_headers );
       } else if ( not current_request_unsent_body.empty() ) {
-        current_request_unsent_body.remove_prefix( ssl.outbound_plaintext().read_from( current_request_unsent_body ) );
+        ssl.outbound_plaintext().read_from( current_request_unsent_body );
       } else if ( not requests.empty() ) {
         requests.front().serialize_headers( current_request_headers );
         current_request_unsent_headers = current_request_headers;

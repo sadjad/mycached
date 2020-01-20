@@ -26,7 +26,7 @@ private:
 
     bool empty() const { return buffer_.readable_region().empty(); }
 
-    size_t append( const std::string_view str ) { return buffer_.read_from( str ); }
+    size_t append( const std::string_view str ) { return buffer_.write( str ); }
 
     const std::string_view str() const { return buffer_.readable_region(); }
 
