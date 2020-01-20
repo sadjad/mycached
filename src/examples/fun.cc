@@ -8,10 +8,10 @@
 #include "address.hh"
 #include "eventloop.hh"
 #include "exception.hh"
+#include "http_client.hh"
 #include "secure_socket.hh"
 #include "socket.hh"
 #include "timer.hh"
-#include "http_client.hh"
 
 using namespace std;
 using t = Log::Category;
@@ -43,24 +43,13 @@ void program_body()
   EventLoop event_loop;
 
   event_loop.add_rule(
-    ssl.socket(),
-    Direction::In,
-    [&] { ssl.do_read(); },
-    [&] { return ssl.want_read(); },
-    [] {},
-    [&] { ssl.socket().throw_if_error(); } );
+    ssl.socket(), Direction::In, [&] { ssl.do_read(); }, [&] { return ssl.want_read(); } );
 
   event_loop.add_rule(
-    ssl.socket(),
-    Direction::Out,
-    [&] { ssl.do_write(); },
-    [&] { return ssl.want_write(); },
-    [] {},
-    [&] { ssl.socket().throw_if_error(); } );
+    ssl.socket(), Direction::Out, [&] { ssl.do_write(); }, [&] { return ssl.want_write(); } );
 
   do {
-    while ( ( not ssl.outbound_plaintext().writable_region().empty() )
-	    and ( not http.requests_empty() ) ) {
+    while ( ( not ssl.outbound_plaintext().writable_region().empty() ) and ( not http.requests_empty() ) ) {
       http.write( ssl.outbound_plaintext() );
     }
 

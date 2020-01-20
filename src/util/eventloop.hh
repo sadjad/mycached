@@ -32,7 +32,6 @@ private:
     CallbackT callback;  //!< A callback that reads or writes fd.
     InterestT interest;  //!< A callback that returns `true` whenever fd should be polled.
     CallbackT cancel;    //!< A callback that is called when the rule is cancelled (e.g. on hangup)
-    CallbackT error;     //!< A callback that is called when the fd is POLLERR or POLLNVAL
 
     //! Returns the number of times fd has been read or written, depending on the value of Rule::direction.
     //! \details This function is used internally by EventLoop; you will not need to call it
@@ -56,8 +55,7 @@ public:
     const Direction direction,
     const CallbackT& callback,
     const InterestT& interest = [] { return true; },
-    const CallbackT& cancel = [] {},
-    const CallbackT& error = [] { throw std::runtime_error( "error on polled file descriptor" ); } );
+    const CallbackT& cancel = [] {} );
 
   //! Calls [poll(2)](\ref man2::poll) and then executes callback for each ready fd.
   Result wait_next_event( const int timeout_ms );

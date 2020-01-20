@@ -1,5 +1,6 @@
 #include "eventloop.hh"
 #include "exception.hh"
+#include "socket.hh"
 #include "timer.hh"
 
 using namespace std;
@@ -19,10 +20,9 @@ void EventLoop::add_rule( const FileDescriptor& fd,
                           const Direction direction,
                           const CallbackT& callback,
                           const InterestT& interest,
-                          const CallbackT& cancel,
-                          const CallbackT& error )
+                          const CallbackT& cancel )
 {
-  _rules.push_back( { fd.duplicate(), direction, callback, interest, cancel, error } );
+  _rules.push_back( { fd.duplicate(), direction, callback, interest, cancel } );
 }
 
 //! \param[in] timeout_ms is the timeout value passed to [poll(2)](\ref man2::poll); `wait_next_event`
@@ -108,7 +108,20 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 
     const auto poll_error = static_cast<bool>( this_pollfd.revents & ( POLLERR | POLLNVAL ) );
     if ( poll_error ) {
-      this_rule.error();
+      /* see if fd is a socket */
+      int socket_error = 0;
+      socklen_t optlen = sizeof( socket_error );
+      const int ret = getsockopt( this_rule.fd.fd_num(), SOL_SOCKET, SO_ERROR, &socket_error, &optlen );
+      if ( ret == -1 and errno == ENOTSOCK ) {
+        throw runtime_error( "error on polled file descriptor" );
+      } else if ( ret == -1 ) {
+        throw unix_error( "getsockopt" );
+      } else if ( optlen != sizeof( socket_error ) ) {
+        throw runtime_error( "unexpected length from getsockopt: " + to_string( optlen ) );
+      } else if ( socket_error ) {
+        throw unix_error( "error on polled socket", socket_error );
+      }
+
       it = _rules.erase( it );
       continue;
     }

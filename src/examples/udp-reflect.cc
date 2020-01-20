@@ -60,9 +60,7 @@ void program_body( const string& id )
       sock.sendto( trolley, "= " + id );
       next_announce_time = timestamp_ns() + BILLION;
     },
-    [&] { return next_announce_time < timestamp_ns(); },
-    [] {},
-    [&] { sock.throw_if_error(); } );
+    [&] { return next_announce_time < timestamp_ns(); } );
 
   event_loop.add_rule(
     sock,
@@ -79,9 +77,7 @@ void program_body( const string& id )
         sock.sendto( trolley, "INFO " + id + " learned mapping other => " + other_address.value().to_string() );
       }
     },
-    [&] { return true; },
-    [] {},
-    [&] { sock.throw_if_error(); } );
+    [&] { return true; } );
 
   uint64_t next_call_time = start_time;
   event_loop.add_rule(
@@ -92,9 +88,7 @@ void program_body( const string& id )
       sock.sendto( other_address.value(), "REQUEST from " + id );
       next_call_time = timestamp_ns() + BILLION / 2;
     },
-    [&] { return next_call_time < timestamp_ns() and other_address.has_value(); },
-    [] {},
-    [&] { sock.throw_if_error(); } );
+    [&] { return next_call_time < timestamp_ns() and other_address.has_value(); } );
 
   while ( event_loop.wait_next_event( 500 ) != EventLoop::Result::Exit ) {
     if ( timestamp_ns() - start_time > 5ULL * 1000 * 1000 * 1000 ) {
