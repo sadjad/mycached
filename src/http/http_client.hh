@@ -64,7 +64,7 @@ public:
     }
   }
 
-  void read( RingBuffer& in ) { return responses_.parse( in ); }
+  void read( RingBuffer& in ) { in.pop( responses_.parse( in.readable_region() ) ); }
   bool responses_empty() const { return responses_.empty(); }
   const HTTPResponse& responses_front() const { return responses_.front(); }
   void pop_response() { return responses_.pop(); }

@@ -5,23 +5,22 @@
 #include <string>
 
 #include "http_message.hh"
-#include "ring_buffer.hh"
 
 template<class MessageType>
 class HTTPMessageSequence
 {
-  static bool have_complete_line( const RingBuffer& rb )
+  static bool have_complete_line( const std::string_view str )
   {
-    size_t first_line_ending = rb.readable_region().find( CRLF );
+    size_t first_line_ending = str.find( CRLF );
     return first_line_ending != std::string::npos;
   }
 
-  static std::string_view get_line( const RingBuffer& rb )
+  static std::string_view get_line( const std::string_view str )
   {
-    size_t first_line_ending = rb.readable_region().find( CRLF );
+    size_t first_line_ending = str.find( CRLF );
     assert( first_line_ending != std::string::npos );
 
-    return rb.readable_region().substr( 0, first_line_ending );
+    return str.substr( 0, first_line_ending );
   }
 
   /* complete messages ready to go */
@@ -29,7 +28,7 @@ class HTTPMessageSequence
 
   /* one loop through the parser */
   /* returns whether to continue */
-  bool parsing_step( RingBuffer& rb );
+  bool parsing_step( std::string_view& buf );
 
   /* what to do to create a new message.
      must be implemented by subclass */
@@ -43,15 +42,19 @@ public:
   HTTPMessageSequence() {}
   virtual ~HTTPMessageSequence() {}
 
-  void parse( RingBuffer& rb )
+  size_t parse( std::string_view buf )
   {
-    if ( rb.readable_region().empty() ) { /* EOF */
+    size_t original_size = buf.size();
+
+    if ( buf.empty() ) { /* EOF */
       message_in_progress_.eof();
     }
 
     /* parse as much as we can */
-    while ( parsing_step( rb ) ) {
+    while ( parsing_step( buf ) ) {
     }
+
+    return original_size - buf.size();
   }
 
   /* getters */
@@ -63,44 +66,44 @@ public:
 };
 
 template<class MessageType>
-bool HTTPMessageSequence<MessageType>::parsing_step( RingBuffer& rb )
+bool HTTPMessageSequence<MessageType>::parsing_step( std::string_view& buf )
 {
   switch ( message_in_progress_.state() ) {
     case FIRST_LINE_PENDING:
       /* do we have a complete line? */
-      if ( not have_complete_line( rb ) ) {
+      if ( not have_complete_line( buf ) ) {
         return false;
       }
 
       /* supply status line to request/response initialization routine */
       initialize_new_message();
 
-      message_in_progress_.set_first_line( get_line( rb ) );
-      rb.pop( message_in_progress_.first_line().size() + 2 );
+      message_in_progress_.set_first_line( get_line( buf ) );
+      buf.remove_prefix( message_in_progress_.first_line().size() + 2 );
 
       return true;
     case HEADERS_PENDING:
       /* do we have a complete line? */
-      if ( not have_complete_line( rb ) ) {
+      if ( not have_complete_line( buf ) ) {
         return false;
       }
 
       /* is line blank? */
       {
-        std::string_view line { get_line( rb ) };
+        std::string_view line { get_line( buf ) };
         if ( line.empty() ) {
           message_in_progress_.done_with_headers();
         } else {
           message_in_progress_.add_header( line );
         }
-        rb.pop( line.size() + 2 );
+        buf.remove_prefix( line.size() + 2 );
       }
       return true;
 
     case BODY_PENDING: {
-      size_t bytes_read = message_in_progress_.read_in_body( rb.readable_region() );
-      assert( bytes_read == rb.readable_region().size() or message_in_progress_.state() == COMPLETE );
-      rb.pop( bytes_read );
+      size_t bytes_read = message_in_progress_.read_in_body( buf );
+      assert( bytes_read == buf.size() or message_in_progress_.state() == COMPLETE );
+      buf.remove_prefix( bytes_read );
     }
       return message_in_progress_.state() == COMPLETE;
 
