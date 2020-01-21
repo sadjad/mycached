@@ -33,18 +33,25 @@ void OpenSSL::check_errors( const std::string_view context, const bool must_have
   }
 }
 
-SSL_CTX* initialize_new_client_context()
+SSLContext::SSLContext()
+  : ctx_( SSL_CTX_new( TLS_client_method() ) )
 {
-  SSL_CTX* ret = SSL_CTX_new( TLS_client_method() );
-  if ( not ret ) {
-    OpenSSL::throw_error( "SSL_CTL_new" );
+  if ( not ctx_ ) {
+    OpenSSL::throw_error( "SSL_CTX_new" );
   }
-  return ret;
+
+  SSL_CTX_set_mode( ctx_.get(), SSL_MODE_AUTO_RETRY );
+  SSL_CTX_set_mode( ctx_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER );
+  SSL_CTX_set_mode( ctx_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE );
+  SSL_CTX_set_verify( ctx_.get(), SSL_VERIFY_PEER, nullptr );
+  SSL_CTX_set1_cert_store( ctx_.get(), certificate_store_ );
 }
 
-SSLContext::SSLContext()
-  : ctx_( initialize_new_client_context() )
-{}
+void SSLContext::trust_certificate( const string_view cert_pem )
+{
+  Certificate cert { cert_pem };
+  certificate_store_.add_certificate( cert );
+}
 
 SSL_handle SSLContext::make_SSL_handle()
 {
@@ -156,7 +163,41 @@ TCPSocketBIO::TCPSocketBIO( TCPSocket&& sock )
   OpenSSL::check( "TCPSocketBIO constructor" );
 }
 
-SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
+MemoryBIO::MemoryBIO( const string_view contents )
+  : contents_( move( contents ) )
+  , bio_( BIO_new_mem_buf( contents.data(), contents.size() ) )
+{
+  if ( not bio_ ) {
+    OpenSSL::throw_error( "BIO_new_mem_buf" );
+  }
+}
+
+Certificate::Certificate( const string_view contents )
+  : certificate_()
+{
+  MemoryBIO mem { contents };
+  certificate_.reset( PEM_read_bio_X509( mem, nullptr, nullptr, nullptr ) );
+  if ( not certificate_ ) {
+    OpenSSL::throw_error( "PEM_read_bio_X509" );
+  }
+}
+
+CertificateStore::CertificateStore()
+  : certificate_store_( X509_STORE_new() )
+{
+  if ( not certificate_store_ ) {
+    OpenSSL::throw_error( "X509_STORE_new" );
+  }
+}
+
+void CertificateStore::add_certificate( Certificate& cert )
+{
+  if ( not X509_STORE_add_cert( certificate_store_.get(), cert ) ) {
+    OpenSSL::throw_error( "X509_STORE_add_cert" );
+  }
+}
+
+SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock, const string& hostname )
   : ssl_( move( ssl ) )
   , socket_( move( sock ) )
 {
@@ -164,12 +205,12 @@ SSLSession::SSLSession( SSL_handle&& ssl, TCPSocket&& sock )
     throw runtime_error( "SecureSocket: constructor must be passed valid SSL structure" );
   }
 
-  SSL_set_mode( ssl_.get(), SSL_MODE_AUTO_RETRY );
-  SSL_set_mode( ssl_.get(), SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER );
-  SSL_set_mode( ssl_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE );
-
   SSL_set0_rbio( ssl_.get(), socket_ );
   SSL_set0_wbio( ssl_.get(), socket_ );
+
+  if ( not SSL_set1_host( ssl_.get(), hostname.c_str() ) ) {
+    OpenSSL::throw_error( "SSL_set1_host" );
+  }
 
   SSL_set_connect_state( ssl_.get() );
 

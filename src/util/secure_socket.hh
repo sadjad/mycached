@@ -33,6 +33,38 @@ public:
   static void throw_error( const std::string_view context ) { return check_errors( context, true ); }
 };
 
+class Certificate
+{
+  struct X509_deleter
+  {
+    void operator()( X509* x ) const { X509_free( x ); }
+  };
+
+  std::unique_ptr<X509, X509_deleter> certificate_;
+
+public:
+  Certificate( const std::string_view contents );
+
+  operator X509*() { return certificate_.get(); }
+};
+
+class CertificateStore
+{
+  struct X509_STORE_deleter
+  {
+    void operator()( X509_STORE* x ) const { X509_STORE_free( x ); }
+  };
+
+  std::unique_ptr<X509_STORE, X509_STORE_deleter> certificate_store_;
+
+public:
+  CertificateStore();
+
+  void add_certificate( Certificate& cert );
+
+  operator X509_STORE*() { return certificate_store_.get(); }
+};
+
 struct SSL_deleter
 {
   void operator()( SSL* x ) const { SSL_free( x ); }
@@ -48,10 +80,19 @@ class SSLContext
   typedef std::unique_ptr<SSL_CTX, CTX_deleter> CTX_handle;
   CTX_handle ctx_;
 
+  CertificateStore certificate_store_ {};
+
 public:
   SSLContext();
 
+  void trust_certificate( const std::string_view cert_pem );
+
   SSL_handle make_SSL_handle();
+};
+
+struct BIO_deleter
+{
+  void operator()( BIO* x ) const { BIO_vfree( x ); }
 };
 
 class TCPSocketBIO : public TCPSocket
@@ -62,6 +103,7 @@ class TCPSocketBIO : public TCPSocket
     {
       void operator()( BIO_METHOD* x ) const { BIO_meth_free( x ); }
     };
+
     std::unique_ptr<BIO_METHOD, BIO_METHOD_deleter> method_;
 
     Method();
@@ -70,14 +112,21 @@ class TCPSocketBIO : public TCPSocket
     static const BIO_METHOD* method();
   };
 
-  struct BIO_deleter
-  {
-    void operator()( BIO* x ) const { BIO_vfree( x ); }
-  };
   std::unique_ptr<BIO, BIO_deleter> bio_;
 
 public:
   TCPSocketBIO( TCPSocket&& sock );
+
+  operator BIO*() { return bio_.get(); }
+};
+
+class MemoryBIO
+{
+  std::string_view contents_;
+  std::unique_ptr<BIO, BIO_deleter> bio_;
+
+public:
+  MemoryBIO( const std::string_view contents );
 
   operator BIO*() { return bio_.get(); }
 };
@@ -100,7 +149,7 @@ class SSLSession
   bool read_waiting_on_write_ {};
 
 public:
-  SSLSession( SSL_handle&& ssl, TCPSocket&& sock );
+  SSLSession( SSL_handle&& ssl, TCPSocket&& sock, const std::string& hostname );
 
   RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
   RingBuffer& inbound_plaintext() { return inbound_plaintext_; }
