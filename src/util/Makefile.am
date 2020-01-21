@@ -1,4 +1,4 @@
-AM_CPPFLAGS = $(CXX17_FLAGS)
+AM_CPPFLAGS = $(CXX17_FLAGS) $(SSL_CFLAGS) $(NICE_CFLAGS)
 AM_CXXFLAGS = $(PICKY_CXXFLAGS)
 
 noinst_LIBRARIES = libmushutil.a
@@ -13,4 +13,5 @@ libmushutil_a_SOURCES = exception.hh \
 	timer.hh timer.cc \
 	build-id.hh build-id.cc \
 	split.hh split.cc \
-	convert.hh convert.cc
+	convert.hh convert.cc \
+	stun.hh stun.cc

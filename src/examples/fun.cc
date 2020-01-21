@@ -11,6 +11,7 @@
 #include "http_client.hh"
 #include "secure_socket.hh"
 #include "socket.hh"
+#include "stun.hh"
 #include "timer.hh"
 
 using namespace std;
@@ -63,6 +64,7 @@ void program_body()
 
   timer().start<t::DNS>();
   Address addr { "cs.stanford.edu", "443" };
+  Address stun_server { "stun.l.google.com", "19302" };
   timer().stop<t::DNS>();
 
   timer().start<t::Nonblock>();
@@ -75,8 +77,14 @@ void program_body()
 
   HTTPClient http;
   http.push_request( { "GET /~keithw/ HTTP/1.1", { { "Host", "cs.stanford.edu" } }, "" } );
-  http.push_request( { "GET /~keithw/nonexist HTTP/1.1", { { "Host", "cs.stanford.edu" } }, "" } );
+  http.push_request( { "GET /~keithw HTTP/1.1", { { "Host", "cs.stanford.edu" } }, "" } );
   http.push_request( { "GET /~keithw/ HTTP/1.1", { { "Host", "cs.stanford.edu" }, { "Connection", "close" } }, "" } );
+
+  STUNClient stun;
+
+  UDPSocket sock;
+  sock.sendto( stun_server, stun.make_binding_request() );
+  UDPSocket::received_datagram udp_scratch { { "0", 0 }, {} };
 
   EventLoop event_loop;
 
@@ -85,6 +93,14 @@ void program_body()
 
   event_loop.add_rule(
     ssl.socket(), Direction::Out, [&] { ssl.do_write(); }, [&] { return ssl.want_write(); } );
+
+  event_loop.add_rule( sock, Direction::In, [&] {
+    auto rec = sock.recv();
+    cerr << "Got STUN reply: " << rec.source_address.to_string() << " says we are: ";
+    auto addr = stun.process_binding_response( rec.payload );
+    cerr << ( addr ? addr.value().to_string() : "(unknown)" );
+    cerr << "\n";
+  } );
 
   do {
     while ( ( not ssl.outbound_plaintext().writable_region().empty() ) and ( not http.requests_empty() ) ) {

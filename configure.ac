@@ -24,6 +24,7 @@ AS_IF([test x"$CLANG_FORMAT" = x],
 
 # Checks for libraries.
 PKG_CHECK_MODULES([SSL],[libssl libcrypto])
+PKG_CHECK_MODULES([NICE],[nice])
 
 # Checks for header files.
 AC_LANG_PUSH(C++)
