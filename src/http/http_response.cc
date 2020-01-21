@@ -1,9 +1,6 @@
-/* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-
 #include <cassert>
 #include <string>
 
-#include "chunked_parser.hh"
 #include "convert.hh"
 #include "http_response.hh"
 #include "mime_type.hh"
@@ -36,18 +33,7 @@ void HTTPResponse::calculate_expected_body_size()
   }
 
   if ( has_header( "Transfer-Encoding" ) ) {
-    vector<string_view> transfer_encoding_header;
-    split( get_header_value( "Transfer-Encoding" ), ',', transfer_encoding_header );
-    if ( equivalent_strings( transfer_encoding_header.back(), "chunked" ) ) {
-      /* Rule 2: size dictated by chunked encoding */
-      /* Rule 2 is a bit ambiguous, but we think section 3.6 makes this acceptable */
-
-      set_expected_body_size( false );
-
-      /* Create body_parser_ with trailers_enabled if requied (RFC 2616 section 14.40) */
-      body_parser_ = make_unique<ChunkedBodyParser>( has_header( "Trailer" ) );
-      return;
-    }
+    throw runtime_error( "HTTPResponse: unsupported Transfer-Encoding header, including chunked encoding" );
   }
 
   if ( ( not has_header( "Transfer-Encoding" ) ) and has_header( "Content-Length" ) ) {

@@ -4,7 +4,6 @@ AM_CXXFLAGS = $(PICKY_CXXFLAGS)
 noinst_LIBRARIES = libmushhttp.a
 
 libmushhttp_a_SOURCES = body_parser.hh \
-	chunked_parser.cc chunked_parser.hh \
 	http_header.cc http_header.hh \
 	http_message.cc http_message.hh \
 	http_message_sequence.hh \
