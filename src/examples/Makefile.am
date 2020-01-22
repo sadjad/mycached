@@ -1,4 +1,4 @@
-AM_CPPFLAGS = $(CXX17_FLAGS) $(SSL_CFLAGS) $(NICE_CFLAGS) -I$(srcdir)/../util -I$(srcdir)/../http
+AM_CPPFLAGS = $(CXX17_FLAGS) $(SSL_CFLAGS) -I$(srcdir)/../util -I$(srcdir)/../http
 AM_CXXFLAGS = $(PICKY_CXXFLAGS)
 
 LAMBDA_FLAGS = -ldl -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
@@ -6,7 +6,7 @@ LAMBDA_FLAGS = -ldl -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
 bin_PROGRAMS = fun cat udp-reflect udp-receiver
 
 fun_SOURCES = fun.cc
-fun_LDADD = ../http/libmushhttp.a ../util/libmushutil.a $(SSL_LIBS) $(NICE_LIBS)
+fun_LDADD = ../http/libmushhttp.a ../util/libmushutil.a $(SSL_LIBS)
 
 cat_SOURCES = cat.cc
 cat_LDADD = ../util/libmushutil.a $(SSL_LIBS)
