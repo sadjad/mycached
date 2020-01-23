@@ -2,7 +2,7 @@
 # Process this file with `autogen.sh` to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([mush], [0.1], [keithw@cs.stanford.edu])
+AC_INIT([mycached], [0.1], [sadjad@cs.stanford.edu])
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_HEADERS([config.h])
 
