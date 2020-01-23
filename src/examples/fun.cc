@@ -89,12 +89,13 @@ void program_body()
   EventLoop event_loop;
 
   event_loop.add_rule(
-    ssl.socket(), Direction::In, [&] { ssl.do_read(); }, [&] { return ssl.want_read(); } );
+    "SSL read", ssl.socket(), Direction::In, [&] { ssl.do_read(); }, [&] { return ssl.want_read(); } );
 
   event_loop.add_rule(
-    ssl.socket(), Direction::Out, [&] { ssl.do_write(); }, [&] { return ssl.want_write(); } );
+    "SSL write", ssl.socket(), Direction::Out, [&] { ssl.do_write(); }, [&] { return ssl.want_write(); } );
 
   event_loop.add_rule(
+    "UDP receive",
     sock,
     Direction::In,
     [&] {
@@ -106,20 +107,26 @@ void program_body()
     },
     [&] { return stun.has_pending_requests(); } );
 
-  do {
-    while ( ( not ssl.outbound_plaintext().writable_region().empty() ) and ( not http.requests_empty() ) ) {
-      http.write( ssl.outbound_plaintext() );
-    }
+  event_loop.add_rule(
+    "HTTP write",
+    [&] { http.write( ssl.outbound_plaintext() ); },
+    [&] { return ( not ssl.outbound_plaintext().writable_region().empty() ) and ( not http.requests_empty() ); } );
 
-    if ( ( not ssl.inbound_plaintext().readable_region().empty() ) ) {
-      http.read( ssl.inbound_plaintext() );
-    }
+  event_loop.add_rule(
+    "HTTP read",
+    [&] { http.read( ssl.inbound_plaintext() ); },
+    [&] { return not ssl.inbound_plaintext().readable_region().empty(); } );
 
-    while ( not http.responses_empty() ) {
+  event_loop.add_rule(
+    "print HTTP response",
+    [&] {
       cerr << "Response received: " << http.responses_front().first_line() << "\n";
       http.pop_response();
-    }
-  } while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit );
+    },
+    [&] { return not http.responses_empty(); } );
+
+  while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
+  }
 }
 
 int main()

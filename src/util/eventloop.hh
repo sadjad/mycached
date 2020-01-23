@@ -2,9 +2,10 @@
 
 #include "file_descriptor.hh"
 
-#include <cstdlib>
 #include <functional>
 #include <list>
+#include <string_view>
+
 #include <poll.h>
 
 //! Waits for events on file descriptors and executes corresponding callbacks.
@@ -19,14 +20,12 @@ public:
   };
 
 private:
-  using CallbackT = std::function<void( void )>; //!< Callback for ready Rule::fd
-  using InterestT = std::function<bool( void )>; //!< `true` return indicates Rule::fd should be polled.
+  using CallbackT = std::function<void( void )>;
+  using InterestT = std::function<bool( void )>;
 
-  //! \brief Specifies a condition and callback that an EventLoop should handle.
-  //! \details Created by calling EventLoop::add_rule() or EventLoop::add_cancelable_rule().
-  class Rule
+  struct FDRule
   {
-  public:
+    std::string name;
     FileDescriptor fd;   //!< FileDescriptor to monitor for activity.
     Direction direction; //!< Direction::In for reading from fd, Direction::Out for writing to fd.
     CallbackT callback;  //!< A callback that reads or writes fd.
@@ -38,7 +37,15 @@ private:
     unsigned int service_count() const;
   };
 
-  std::list<Rule> _rules {}; //!< All rules that have been added and not canceled.
+  struct NonFDRule
+  {
+    std::string name;
+    CallbackT callback;
+    InterestT interest;
+  };
+
+  std::list<FDRule> _fd_rules {};
+  std::list<NonFDRule> _non_fd_rules {};
 
 public:
   //! Returned by each call to EventLoop::wait_next_event.
@@ -51,28 +58,20 @@ public:
 
   //! Add a rule whose callback will be called when `fd` is ready in the specified Direction.
   void add_rule(
+    const std::string& name,
     const FileDescriptor& fd,
     const Direction direction,
     const CallbackT& callback,
     const InterestT& interest = [] { return true; },
     const CallbackT& cancel = [] {} );
 
+  void add_rule(
+    const std::string& name,
+    const CallbackT& callback,
+    const InterestT& interest = [] { return true; } );
+
   //! Calls [poll(2)](\ref man2::poll) and then executes callback for each ready fd.
   Result wait_next_event( const int timeout_ms );
 };
 
 using Direction = EventLoop::Direction;
-
-//! \class EventLoop
-//!
-//! An EventLoop holds a std::list of Rule objects. Each time EventLoop::wait_next_event is
-//! executed, the EventLoop uses the Rule objects to construct a call to [poll(2)](\ref man2::poll).
-//!
-//! When a Rule is installed using EventLoop::add_rule, it will be polled for the specified Rule::direction
-//! whenver the Rule::interest callback returns `true`, until Rule::fd is no longer readable
-//! (for Rule::direction == Direction::In) or writable (for Rule::direction == Direction::Out).
-//! Once this occurs, the Rule is canceled, i.e., the EventLoop deletes it.
-//!
-//! A Rule installed using EventLoop::add_cancelable_rule will be polled and canceled under the
-//! same conditions, with the additional condition that if Rule::callback returns `true`, the
-//! Rule will be canceled.

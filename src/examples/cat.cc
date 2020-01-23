@@ -13,10 +13,10 @@ using namespace std;
 
 void program_body()
 {
-  FileDescriptor in { STDIN_FILENO };
+  FileDescriptor in { CheckSystemCall( "dup", dup( STDIN_FILENO ) ) };
   in.set_blocking( false );
 
-  FileDescriptor out { STDOUT_FILENO };
+  FileDescriptor out { CheckSystemCall( "dup", dup( STDOUT_FILENO ) ) };
   out.set_blocking( false );
 
   RingBuffer buf { 1048576 };
@@ -24,10 +24,18 @@ void program_body()
   {
     EventLoop event_loop;
     event_loop.add_rule(
-      in, Direction::In, [&] { buf.read_from( in ); }, [&] { return !buf.writable_region().empty(); } );
+      "read from stdin",
+      in,
+      Direction::In,
+      [&] { buf.read_from( in ); },
+      [&] { return !buf.writable_region().empty(); } );
 
     event_loop.add_rule(
-      out, Direction::Out, [&] { buf.write_to( out ); }, [&] { return !buf.readable_region().empty(); } );
+      "write to stdout",
+      out,
+      Direction::Out,
+      [&] { buf.write_to( out ); },
+      [&] { return !buf.readable_region().empty(); } );
 
     while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
     }

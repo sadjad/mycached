@@ -54,6 +54,7 @@ void program_body( const string& id )
 
   uint64_t next_announce_time = start_time;
   event_loop.add_rule(
+    "UDP send announcement",
     sock,
     Direction::Out,
     [&] {
@@ -63,6 +64,7 @@ void program_body( const string& id )
     [&] { return next_announce_time < timestamp_ns(); } );
 
   event_loop.add_rule(
+    "UDP receive",
     sock,
     Direction::In,
     [&] {
@@ -81,6 +83,7 @@ void program_body( const string& id )
 
   uint64_t next_call_time = start_time;
   event_loop.add_rule(
+    "UDP send call",
     sock,
     Direction::Out,
     [&] {
