@@ -104,17 +104,17 @@ void program_body( const string& id )
 int main( const int argc, const char* const argv[] )
 {
   try {
-    timer();
+    global_timer();
 
     if ( argc != 2 ) {
       throw runtime_error( "Usage: udp-reflect client|server" );
     }
 
     program_body( argv[1] );
-    cout << timer().summary() << "\n";
+    cout << global_timer().summary() << "\n";
   } catch ( const exception& e ) {
     cout << "Exception: " << e.what() << endl;
-    cout << timer().summary() << "\n";
+    cout << global_timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 

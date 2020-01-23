@@ -45,12 +45,12 @@ void program_body()
 int main()
 {
   try {
-    timer();
+    global_timer();
     program_body();
-    cerr << timer().summary() << "\n";
+    cerr << global_timer().summary() << "\n";
   } catch ( const exception& e ) {
     cerr << "Exception: " << e.what() << endl;
-    cerr << timer().summary() << "\n";
+    cerr << global_timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 

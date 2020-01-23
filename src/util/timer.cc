@@ -11,7 +11,7 @@ using namespace std;
 constexpr double THOUSAND = 1000.0;
 constexpr double MILLION = 1000000.0;
 
-string Log::summary() const
+string Timer::summary() const
 {
   const uint64_t now = timestamp_ns();
 
@@ -28,11 +28,11 @@ string Log::summary() const
   for ( unsigned int i = 0; i < num_categories; i++ ) {
     out << "   " << _category_names.at( i ) << ": ";
     out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
-    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _logs.at( i ).total_ns / double( elapsed ) << "%";
-    accounted += _logs.at( i ).total_ns;
+    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _records.at( i ).total_ns / double( elapsed ) << "%";
+    accounted += _records.at( i ).total_ns;
 
-    out << "     [max=" << _logs.at( i ).max_ns / THOUSAND << " us]";
-    out << " [count=" << _logs.at( i ).count << "]";
+    out << "     [max=" << _records.at( i ).max_ns / THOUSAND << " us]";
+    out << " [count=" << _records.at( i ).count << "]";
     out << "\n";
   }
 

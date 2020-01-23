@@ -68,12 +68,12 @@ void program_body()
 int main()
 {
   try {
-    timer();
+    global_timer();
     program_body();
-    cout << timer().summary() << "\n";
+    cout << global_timer().summary() << "\n";
   } catch ( const exception& e ) {
     cout << "Exception: " << e.what() << endl;
-    cout << timer().summary() << "\n";
+    cout << global_timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 

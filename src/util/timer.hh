@@ -13,9 +13,23 @@ inline uint64_t timestamp_ns()
   return std::chrono::steady_clock::now().time_since_epoch().count();
 }
 
-class Log
+class Timer
 {
 public:
+  struct Record
+  {
+    uint64_t count;
+    uint64_t total_ns;
+    uint64_t max_ns;
+
+    void log( const uint64_t time_ns )
+    {
+      count++;
+      total_ns += time_ns;
+      max_ns = std::max( max_ns, time_ns );
+    }
+  };
+
   enum class Category
   {
     DNS,
@@ -32,38 +46,12 @@ public:
 
 private:
   uint64_t _beginning_timestamp = timestamp_ns();
-
-  struct Record
-  {
-    uint64_t count;
-    uint64_t total_ns;
-    uint64_t max_ns;
-  };
-
-  std::array<Record, num_categories> _logs {};
-
-public:
-  void log( const Category category, const uint64_t time_ns )
-  {
-    auto& entry = _logs[static_cast<size_t>( category )];
-
-    entry.count++;
-    entry.total_ns += time_ns;
-    entry.max_ns = std::max( entry.max_ns, time_ns );
-  }
-
-  std::string summary() const;
-};
-
-class Timer
-{
-private:
-  Log _log {};
-  std::optional<Log::Category> _current_category {};
+  std::array<Record, num_categories> _records {};
+  std::optional<Category> _current_category {};
   uint64_t _start_time {};
 
 public:
-  template<Log::Category category>
+  template<Category category>
   void start()
   {
     if ( _current_category.has_value() ) {
@@ -74,30 +62,30 @@ public:
     _start_time = timestamp_ns();
   }
 
-  template<Log::Category category>
+  template<Category category>
   void stop()
   {
     if ( not _current_category.has_value() or _current_category.value() != category ) {
       throw std::runtime_error( "timer stopped when not running, or with mismatched category" );
     }
 
-    _log.log( category, timestamp_ns() - _start_time );
+    _records[static_cast<size_t>( category )].log( timestamp_ns() - _start_time );
     _current_category.reset();
   }
 
-  std::string summary() const { return _log.summary(); }
+  std::string summary() const;
 };
 
-inline Timer& timer()
+inline Timer& global_timer()
 {
   static Timer the_global_timer;
   return the_global_timer;
 }
 
-template<Log::Category category>
+template<Timer::Category category>
 class ScopeTimer
 {
 public:
-  ScopeTimer() { timer().start<category>(); }
-  ~ScopeTimer() { timer().stop<category>(); }
+  ScopeTimer() { global_timer().start<category>(); }
+  ~ScopeTimer() { global_timer().stop<category>(); }
 };

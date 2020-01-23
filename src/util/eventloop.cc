@@ -29,7 +29,7 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 {
   // first, handle the non-file-descriptor-related rules
   {
-    ScopeTimer<Log::Category::Nonblock> timer;
+    ScopeTimer<Timer::Category::Nonblock> timer;
     for ( auto& this_rule : _non_fd_rules ) {
       unsigned int iterations = 0;
       while ( this_rule.interest() ) {
@@ -81,14 +81,14 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 
   // call poll -- wait until one of the fds satisfies one of the rules (writeable/readable)
   {
-    ScopeTimer<Log::Category::WaitingForEvent> timer;
+    ScopeTimer<Timer::Category::WaitingForEvent> timer;
     if ( 0 == CheckSystemCall( "poll", ::poll( pollfds.data(), pollfds.size(), timeout_ms ) ) ) {
       return Result::Timeout;
     }
   }
 
   // go through the poll results
-  ScopeTimer<Log::Category::Nonblock> timer;
+  ScopeTimer<Timer::Category::Nonblock> timer;
 
   for ( auto [it, idx] = make_pair( _fd_rules.begin(), size_t( 0 ) ); it != _fd_rules.end(); ++idx ) {
     const auto& this_pollfd = pollfds[idx];

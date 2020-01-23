@@ -15,7 +15,7 @@
 #include "timer.hh"
 
 using namespace std;
-using t = Log::Category;
+using t = Timer::Category;
 
 const string usertrust_certificate = R"(
 -----BEGIN CERTIFICATE-----
@@ -62,14 +62,14 @@ void program_body()
   FileDescriptor standard_output { CheckSystemCall( "dup", dup( STDOUT_FILENO ) ) };
   standard_output.set_blocking( false );
 
-  timer().start<t::DNS>();
+  global_timer().start<t::DNS>();
   Address addr { "cs.stanford.edu", "443" };
   Address stun_server { "stun.l.google.com", "19302" };
-  timer().stop<t::DNS>();
+  global_timer().stop<t::DNS>();
 
-  timer().start<t::Nonblock>();
+  global_timer().start<t::Nonblock>();
   tcp_sock.connect( addr );
-  timer().stop<t::Nonblock>();
+  global_timer().stop<t::Nonblock>();
 
   SSLContext ssl_context;
   ssl_context.trust_certificate( usertrust_certificate );
@@ -133,10 +133,10 @@ int main()
 {
   try {
     program_body();
-    cout << timer().summary() << "\n";
+    cout << global_timer().summary() << "\n";
   } catch ( const exception& e ) {
     cout << "Exception: " << e.what() << endl;
-    cout << timer().summary() << "\n";
+    cout << global_timer().summary() << "\n";
     return EXIT_FAILURE;
   }
 
