@@ -41,6 +41,7 @@ AC_CONFIG_FILES([
     src/http/Makefile
     src/aws/Makefile
     src/examples/Makefile
+    src/frontend/Makefile
     src/tests/Makefile
 ])
 AC_OUTPUT
