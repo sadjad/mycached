@@ -78,3 +78,9 @@ optional<Address> STUNClient::process_binding_response( const string_view buffer
 
   return Address { reinterpret_cast<const sockaddr*>( &address ), sizeof( address ) };
 }
+
+bool STUNClient::has_pending_requests()
+{
+  expire_pending_requests();
+  return not pending_requests_.empty();
+}

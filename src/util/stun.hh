@@ -25,4 +25,6 @@ class STUNClient
 public:
   std::string make_binding_request();
   std::optional<Address> process_binding_response( const std::string_view buffer );
+
+  bool has_pending_requests();
 };

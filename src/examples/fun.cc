@@ -94,13 +94,17 @@ void program_body()
   event_loop.add_rule(
     ssl.socket(), Direction::Out, [&] { ssl.do_write(); }, [&] { return ssl.want_write(); } );
 
-  event_loop.add_rule( sock, Direction::In, [&] {
-    auto rec = sock.recv();
-    cerr << "Got STUN reply: " << rec.source_address.to_string() << " says we are: ";
-    auto addr = stun.process_binding_response( rec.payload );
-    cerr << ( addr ? addr.value().to_string() : "(unknown)" );
-    cerr << "\n";
-  } );
+  event_loop.add_rule(
+    sock,
+    Direction::In,
+    [&] {
+      auto rec = sock.recv();
+      cerr << "Got STUN reply: " << rec.source_address.to_string() << " says we are: ";
+      auto addr = stun.process_binding_response( rec.payload );
+      cerr << ( addr ? addr.value().to_string() : "(unknown)" );
+      cerr << "\n";
+    },
+    [&] { return stun.has_pending_requests(); } );
 
   do {
     while ( ( not ssl.outbound_plaintext().writable_region().empty() ) and ( not http.requests_empty() ) ) {
