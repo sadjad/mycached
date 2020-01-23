@@ -19,7 +19,7 @@ string Timer::summary() const
 
   ostringstream out;
 
-  out << "Timing summary\n--------------\n\n";
+  out << "Global timing summary\n---------------------\n\n";
 
   out << "Total time: " << setprecision( 2 ) << ( now - _beginning_timestamp ) / MILLION << " ms\n";
 

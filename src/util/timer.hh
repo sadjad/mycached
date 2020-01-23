@@ -52,24 +52,24 @@ private:
 
 public:
   template<Category category>
-  void start()
+  void start( const uint64_t now = timestamp_ns() )
   {
     if ( _current_category.has_value() ) {
       throw std::runtime_error( "timer started when already running" );
     }
 
     _current_category = category;
-    _start_time = timestamp_ns();
+    _start_time = now;
   }
 
   template<Category category>
-  void stop()
+  void stop( const uint64_t now = timestamp_ns() )
   {
     if ( not _current_category.has_value() or _current_category.value() != category ) {
       throw std::runtime_error( "timer stopped when not running, or with mismatched category" );
     }
 
-    _records[static_cast<size_t>( category )].log( timestamp_ns() - _start_time );
+    _records[static_cast<size_t>( category )].log( now - _start_time );
     _current_category.reset();
   }
 
@@ -83,9 +83,34 @@ inline Timer& global_timer()
 }
 
 template<Timer::Category category>
-class ScopeTimer
+class GlobalScopeTimer
 {
 public:
-  ScopeTimer() { global_timer().start<category>(); }
-  ~ScopeTimer() { global_timer().stop<category>(); }
+  GlobalScopeTimer() { global_timer().start<category>(); }
+  ~GlobalScopeTimer() { global_timer().stop<category>(); }
+};
+
+template<Timer::Category category>
+class RecordScopeTimer
+{
+  Timer::Record* _timer;
+  uint64_t _start_time;
+
+public:
+  RecordScopeTimer( Timer::Record& timer )
+    : _timer( &timer )
+    , _start_time( timestamp_ns() )
+  {
+    global_timer().start<category>( _start_time );
+  }
+
+  ~RecordScopeTimer()
+  {
+    const uint64_t now = timestamp_ns();
+    _timer->log( now - _start_time );
+    global_timer().stop<category>( now );
+  }
+
+  RecordScopeTimer( const RecordScopeTimer& ) = delete;
+  RecordScopeTimer& operator=( const RecordScopeTimer& ) = delete;
 };

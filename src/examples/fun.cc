@@ -67,9 +67,10 @@ void program_body()
   Address stun_server { "stun.l.google.com", "19302" };
   global_timer().stop<t::DNS>();
 
-  global_timer().start<t::Nonblock>();
-  tcp_sock.connect( addr );
-  global_timer().stop<t::Nonblock>();
+  {
+    GlobalScopeTimer<t::Nonblock> timer;
+    tcp_sock.connect( addr );
+  }
 
   SSLContext ssl_context;
   ssl_context.trust_certificate( usertrust_certificate );
@@ -127,6 +128,8 @@ void program_body()
 
   while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit ) {
   }
+
+  cout << event_loop.summary() << "\n";
 }
 
 int main()

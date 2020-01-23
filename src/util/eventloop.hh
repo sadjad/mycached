@@ -1,12 +1,13 @@
 #pragma once
 
-#include "file_descriptor.hh"
-
 #include <functional>
 #include <list>
 #include <string_view>
 
 #include <poll.h>
+
+#include "file_descriptor.hh"
+#include "timer.hh"
 
 //! Waits for events on file descriptors and executes corresponding callbacks.
 class EventLoop
@@ -23,14 +24,20 @@ private:
   using CallbackT = std::function<void( void )>;
   using InterestT = std::function<bool( void )>;
 
-  struct FDRule
+  struct RuleInfo
   {
     std::string name;
+    Timer::Record timer;
+  };
+
+  struct FDRule
+  {
     FileDescriptor fd;   //!< FileDescriptor to monitor for activity.
     Direction direction; //!< Direction::In for reading from fd, Direction::Out for writing to fd.
     CallbackT callback;  //!< A callback that reads or writes fd.
     InterestT interest;  //!< A callback that returns `true` whenever fd should be polled.
     CallbackT cancel;    //!< A callback that is called when the rule is cancelled (e.g. on hangup)
+    size_t info_index;
 
     //! Returns the number of times fd has been read or written, depending on the value of Rule::direction.
     //! \details This function is used internally by EventLoop; you will not need to call it
@@ -39,11 +46,12 @@ private:
 
   struct NonFDRule
   {
-    std::string name;
     CallbackT callback;
     InterestT interest;
+    size_t info_index;
   };
 
+  std::vector<RuleInfo> _rule_info {};
   std::list<FDRule> _fd_rules {};
   std::list<NonFDRule> _non_fd_rules {};
 
@@ -72,6 +80,8 @@ public:
 
   //! Calls [poll(2)](\ref man2::poll) and then executes callback for each ready fd.
   Result wait_next_event( const int timeout_ms );
+
+  std::string summary() const;
 };
 
 using Direction = EventLoop::Direction;

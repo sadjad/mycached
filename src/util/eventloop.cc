@@ -3,6 +3,10 @@
 #include "socket.hh"
 #include "timer.hh"
 
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+
 using namespace std;
 
 unsigned int EventLoop::FDRule::service_count() const
@@ -17,26 +21,28 @@ void EventLoop::add_rule( const string& name,
                           const InterestT& interest,
                           const CallbackT& cancel )
 {
-  _fd_rules.push_back( { name, fd.duplicate(), direction, callback, interest, cancel } );
+  _rule_info.push_back( { name, {} } );
+  _fd_rules.push_back( { fd.duplicate(), direction, callback, interest, cancel, _rule_info.size() - 1 } );
 }
 
 void EventLoop::add_rule( const string& name, const CallbackT& callback, const InterestT& interest )
 {
-  _non_fd_rules.push_back( { name, callback, interest } );
+  _rule_info.push_back( { name, {} } );
+  _non_fd_rules.push_back( { callback, interest, _rule_info.size() - 1 } );
 }
 
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 {
   // first, handle the non-file-descriptor-related rules
   {
-    ScopeTimer<Timer::Category::Nonblock> timer;
     for ( auto& this_rule : _non_fd_rules ) {
-      unsigned int iterations = 0;
+      RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
+      uint8_t iterations = 0;
       while ( this_rule.interest() ) {
         this_rule.callback();
         ++iterations;
-        if ( iterations > 255 ) {
-          throw runtime_error( "EventLoop: busy wait detected: rule \"" + this_rule.name
+        if ( iterations > 128 ) {
+          throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
                                + "\" is still interested after running callback " + to_string( iterations )
                                + " times" );
         }
@@ -50,8 +56,8 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   bool something_to_poll = false;
 
   // set up the pollfd for each rule
-  for ( auto it = _fd_rules.cbegin(); it != _fd_rules.cend(); ) { // NOTE: it gets erased or incremented in loop body
-    const auto& this_rule = *it;
+  for ( auto it = _fd_rules.begin(); it != _fd_rules.end(); ) { // NOTE: it gets erased or incremented in loop body
+    auto& this_rule = *it;
     if ( this_rule.direction == Direction::In && this_rule.fd.eof() ) {
       // no more reading on this rule, it's reached eof
       this_rule.cancel();
@@ -65,6 +71,7 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       continue;
     }
 
+    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
     if ( this_rule.interest() ) {
       pollfds.push_back( { this_rule.fd.fd_num(), static_cast<short>( this_rule.direction ), 0 } );
       something_to_poll = true;
@@ -81,18 +88,16 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 
   // call poll -- wait until one of the fds satisfies one of the rules (writeable/readable)
   {
-    ScopeTimer<Timer::Category::WaitingForEvent> timer;
+    GlobalScopeTimer<Timer::Category::WaitingForEvent> timer;
     if ( 0 == CheckSystemCall( "poll", ::poll( pollfds.data(), pollfds.size(), timeout_ms ) ) ) {
       return Result::Timeout;
     }
   }
 
   // go through the poll results
-  ScopeTimer<Timer::Category::Nonblock> timer;
-
   for ( auto [it, idx] = make_pair( _fd_rules.begin(), size_t( 0 ) ); it != _fd_rules.end(); ++idx ) {
     const auto& this_pollfd = pollfds[idx];
-    const auto& this_rule = *it;
+    auto& this_rule = *it;
 
     const auto poll_error = static_cast<bool>( this_pollfd.revents & ( POLLERR | POLLNVAL ) );
     if ( poll_error ) {
@@ -101,13 +106,15 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       socklen_t optlen = sizeof( socket_error );
       const int ret = getsockopt( this_rule.fd.fd_num(), SOL_SOCKET, SO_ERROR, &socket_error, &optlen );
       if ( ret == -1 and errno == ENOTSOCK ) {
-        throw runtime_error( "error on polled file descriptor for rule \"" + this_rule.name + "\"" );
+        throw runtime_error( "error on polled file descriptor for rule \"" + _rule_info.at( this_rule.info_index ).name
+                             + "\"" );
       } else if ( ret == -1 ) {
         throw unix_error( "getsockopt" );
       } else if ( optlen != sizeof( socket_error ) ) {
         throw runtime_error( "unexpected length from getsockopt: " + to_string( optlen ) );
       } else if ( socket_error ) {
-        throw unix_error( "error on polled socket for rule \"" + this_rule.name + "\"", socket_error );
+        throw unix_error( "error on polled socket for rule \"" + _rule_info.at( this_rule.info_index ).name + "\"",
+                          socket_error );
       }
 
       this_rule.cancel();
@@ -127,13 +134,14 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
     }
 
     if ( poll_ready ) {
+      RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
       // we only want to call callback if revents includes the event we asked for
       const auto count_before = this_rule.service_count();
       this_rule.callback();
 
       // only check for busy wait if we're not canceling or exiting
       if ( count_before == this_rule.service_count() and this_rule.interest() ) {
-        throw runtime_error( "EventLoop: busy wait detected: rule \"" + this_rule.name
+        throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
                              + "\" did not read/write fd and is still interested" );
       }
     }
@@ -142,4 +150,28 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   }
 
   return Result::Success;
+}
+
+constexpr double THOUSAND = 1000.0;
+
+string EventLoop::summary() const
+{
+  ostringstream out;
+
+  out << "EventLoop timing summary\n------------------------\n\n";
+
+  for ( const auto& rule : _rule_info ) {
+    const auto& name = rule.name;
+    const auto& timer = rule.timer;
+
+    out << "   " << name << ": ";
+    out << string( 32 - name.size(), ' ' );
+    out << fixed << setw( 6 ) << setprecision( 1 ) << timer.total_ns / THOUSAND << " us";
+
+    out << "     [max=" << timer.max_ns / THOUSAND << " us]";
+    out << " [count=" << timer.count << "]";
+    out << "\n";
+  }
+
+  return out.str();
 }
