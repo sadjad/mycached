@@ -9,7 +9,7 @@ using namespace std;
 
 void STUNClient::expire_pending_requests()
 {
-  const uint64_t now = timestamp_ns();
+  const uint64_t now = Timer::timestamp_ns();
 
   for ( auto it = pending_requests_.begin(); it != pending_requests_.end(); ) {
     if ( it->second < now ) {
@@ -30,7 +30,7 @@ string STUNClient::make_binding_request()
     transaction_id.push_back( dist_( rng_ ) );
   }
 
-  pending_requests_.emplace( transaction_id, timestamp_ns() + uint64_t( 5 ) * 1000 * 1000 * 1000 );
+  pending_requests_.emplace( transaction_id, Timer::timestamp_ns() + uint64_t( 5 ) * 1000 * 1000 * 1000 );
 
   return string( "\x00\x01\x00\x00", 4 ) + transaction_id;
 }

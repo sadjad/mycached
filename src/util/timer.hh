@@ -6,16 +6,18 @@
 #include <string>
 #include <type_traits>
 
-inline uint64_t timestamp_ns()
-{
-  static_assert( std::is_same<std::chrono::steady_clock::duration, std::chrono::nanoseconds>::value );
-
-  return std::chrono::steady_clock::now().time_since_epoch().count();
-}
-
 class Timer
 {
 public:
+  static inline uint64_t timestamp_ns()
+  {
+    static_assert( std::is_same<std::chrono::steady_clock::duration, std::chrono::nanoseconds>::value );
+
+    return std::chrono::steady_clock::now().time_since_epoch().count();
+  }
+
+  static std::string pp_ns( const uint64_t duration_ns );
+
   struct Record
   {
     uint64_t count;
@@ -99,14 +101,14 @@ class RecordScopeTimer
 public:
   RecordScopeTimer( Timer::Record& timer )
     : _timer( &timer )
-    , _start_time( timestamp_ns() )
+    , _start_time( Timer::timestamp_ns() )
   {
     global_timer().start<category>( _start_time );
   }
 
   ~RecordScopeTimer()
   {
-    const uint64_t now = timestamp_ns();
+    const uint64_t now = Timer::timestamp_ns();
     _timer->log( now - _start_time );
     global_timer().stop<category>( now );
   }

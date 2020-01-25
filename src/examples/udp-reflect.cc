@@ -38,7 +38,7 @@ void split_on_char( const string_view str, const char ch_to_find, vector<string_
 
 void program_body( const string& id )
 {
-  const uint64_t start_time = timestamp_ns();
+  const uint64_t start_time = Timer::timestamp_ns();
 
   cerr << "Build ID: " << build_id_hex() << "\n";
 
@@ -59,9 +59,9 @@ void program_body( const string& id )
     Direction::Out,
     [&] {
       sock.sendto( trolley, "= " + id );
-      next_announce_time = timestamp_ns() + BILLION;
+      next_announce_time = Timer::timestamp_ns() + BILLION;
     },
-    [&] { return next_announce_time < timestamp_ns(); } );
+    [&] { return next_announce_time < Timer::timestamp_ns(); } );
 
   event_loop.add_rule(
     "UDP receive",
@@ -89,12 +89,12 @@ void program_body( const string& id )
     [&] {
       sock.sendto( trolley, "INFO sending request to other" );
       sock.sendto( other_address.value(), "REQUEST from " + id );
-      next_call_time = timestamp_ns() + BILLION / 2;
+      next_call_time = Timer::timestamp_ns() + BILLION / 2;
     },
-    [&] { return next_call_time < timestamp_ns() and other_address.has_value(); } );
+    [&] { return next_call_time < Timer::timestamp_ns() and other_address.has_value(); } );
 
   while ( event_loop.wait_next_event( 500 ) != EventLoop::Result::Exit ) {
-    if ( timestamp_ns() - start_time > 5ULL * 1000 * 1000 * 1000 ) {
+    if ( Timer::timestamp_ns() - start_time > 5ULL * 1000 * 1000 * 1000 ) {
       cout << id << " timeout\n";
       return;
     }

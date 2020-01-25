@@ -166,9 +166,9 @@ string EventLoop::summary() const
 
     out << "   " << name << ": ";
     out << string( 32 - name.size(), ' ' );
-    out << fixed << setw( 6 ) << setprecision( 1 ) << timer.total_ns / THOUSAND << " us";
+    out << Timer::pp_ns( timer.total_ns );
 
-    out << "     [max=" << timer.max_ns / THOUSAND << " us]";
+    out << "     [max=" << Timer::pp_ns( timer.max_ns ) << "]";
     out << " [count=" << timer.count << "]";
     out << "\n";
   }
