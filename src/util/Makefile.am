@@ -12,7 +12,7 @@ libmushutil_a_SOURCES = exception.hh \
 	ring_buffer.hh ring_buffer.cc \
 	secure_socket.hh secure_socket.cc \
 	timer.hh timer.cc \
-	build-id.hh build-id.cc build-id.ld \
+	elf-info.hh elf-info.cc elf-info.ld \
 	split.hh split.cc \
 	convert.hh convert.cc \
 	stun.hh stun.cc \

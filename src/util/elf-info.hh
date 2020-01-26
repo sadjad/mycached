@@ -5,3 +5,5 @@
 
 std::string_view build_id();
 std::string build_id_hex();
+
+std::string_view interpreter();

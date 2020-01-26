@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "address.hh"
+#include "elf-info.hh"
 #include "eventloop.hh"
 #include "exception.hh"
 #include "http_client.hh"
@@ -56,6 +57,12 @@ jjxDah2nGN59PRbxYvnKkKj9
 
 void program_body()
 {
+  ios::sync_with_stdio( false );
+
+  cerr << "Build ID: " << build_id_hex() << "\n";
+
+  cerr << "Interpreter: " << interpreter() << "\n";
+
   TCPSocket tcp_sock;
   tcp_sock.set_blocking( false );
 

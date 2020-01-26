@@ -5,7 +5,7 @@
 
 #include <unistd.h>
 
-#include "build-id.hh"
+#include "elf-info.hh"
 #include "eventloop.hh"
 #include "exception.hh"
 #include "socket.hh"
