@@ -12,9 +12,6 @@ PICKY_CXXFLAGS="-Wpedantic -Wall -Wextra -Weffc++ -Werror"
 AC_SUBST([CXX17_FLAGS])
 AC_SUBST([PICKY_CXXFLAGS])
 
-# Change default CXXflags
-: ${CXXFLAGS="-g -Ofast -march=native"}
-
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_RANLIB
