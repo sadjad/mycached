@@ -1,4 +1,4 @@
-AM_CPPFLAGS = $(CXX17_FLAGS) $(SSL_CFLAGS) -I$(srcdir)/../util -I$(srcdir)/../http
+AM_CPPFLAGS = $(CXX17_FLAGS) $(SSL_CFLAGS) -I$(srcdir)/../util -I$(srcdir)/../http -I$(srcdir)/../aws
 AM_CXXFLAGS = $(PICKY_CXXFLAGS)
 
 LAMBDA_FLAGS = -ldl -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
@@ -19,4 +19,4 @@ udp_receiver_SOURCES = udp-receiver.cc
 udp_receiver_LDADD = ../util/libmushutil.a
 
 aws_fun_SOURCES = aws-fun.cc
-aws_fun_LDADD = ../http/libmushhttp.a ../util/libmushutil.a $(SSL_LIBS) $(srcdir)/../util/elf-info.ld
+aws_fun_LDADD = ../aws/libmushaws.a ../http/libmushhttp.a ../util/libmushutil.a $(SSL_LIBS) $(srcdir)/../util/elf-info.ld
