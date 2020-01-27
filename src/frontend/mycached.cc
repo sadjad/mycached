@@ -55,59 +55,59 @@ int main( int argc, char* argv[] )
       "tcp listener",
       listen_sock,
       Direction::In,
-      [&listen_sock, &clients, &event_loop, &client_id]() {
+      [&]() {
         clients.emplace(
           piecewise_construct,
           forward_as_tuple( client_id ),
           forward_as_tuple( client_id, move( listen_sock.accept() ) ) );
 
         Client& client = clients.at( client_id );
+        client.session.socket().set_blocking( false );
 
-        event_loop.add_rule(
-          "client read",
-          client.session.socket(),
-          Direction::In,
-          [&client]() { client.session.do_read(); },
-          [&client]() { return client.session.want_read(); } );
+        event_loop.add_rule( "client read",
+                             client.session.socket(),
+                             Direction::In,
+                             [&]() { client.session.do_read(); },
+                             [&]() { return client.session.want_read(); } );
 
-        event_loop.add_rule(
-          "client write",
-          client.session.socket(),
-          Direction::Out,
-          [&client]() { client.session.do_write(); },
-          [&client]() { return client.session.want_write(); } );
+        event_loop.add_rule( "client write",
+                             client.session.socket(),
+                             Direction::Out,
+                             [&]() { client.session.do_write(); },
+                             [&]() { return client.session.want_write(); } );
 
         event_loop.add_rule(
           "HTTP read",
-          [&client] { client.http.read( client.session.inbound_plaintext() ); },
-          [&client] {
+          [&] { client.http.read( client.session.inbound_plaintext() ); },
+          [&] {
             return not client.session.inbound_plaintext()
                          .readable_region()
                          .empty();
           } );
 
-        event_loop.add_rule( "HTTP write",
-                             [&client] {
-                               client.http.write(
-                                 client.session.outbound_plaintext() );
-                             },
-                             [&client]() {
-                               return not client.session.outbound_plaintext()
-                                            .writable_region()
-                                            .empty()
-                                      and not client.http.responses_empty();
-                             } );
+        event_loop.add_rule(
+          "request",
+          [&]() {
+            auto& request = client.http.requests_front();
+            cerr << "request received: " << request.first_line() << endl;
+            client.http.pop_request();
+
+            client.http.push_response(
+              { "HTTP/1.1 200 OK",
+                { { "Server", "mycached/0.0.1" }, { "Content-Length", "1" } },
+                "A" } );
+          },
+          [&]() { return not client.http.requests_empty(); } );
 
         event_loop.add_rule(
-          "got request",
-          [&client]() {
-            cerr << "request received: "
-                 << client.http.requests_front().first_line() << endl;
-
-            client.http.pop_request();
-          },
-          [&client]() { return not client.http.requests_empty(); } );
-
+          "HTTP write",
+          [&] { client.http.write( client.session.outbound_plaintext() ); },
+          [&]() {
+            return not client.session.outbound_plaintext()
+                         .writable_region()
+                         .empty()
+                   and not client.http.responses_empty();
+          } );
         client_id++;
       },
       []() { return true; },
