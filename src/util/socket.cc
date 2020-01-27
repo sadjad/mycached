@@ -198,3 +198,25 @@ void Socket::throw_if_error() const
     throw unix_error( "socket error", socket_error );
   }
 }
+
+void TCPSession::do_read()
+{
+  simple_string_span target = inbound_plaintext_.writable_region();
+  const int bytes_read = socket_.read( target );
+
+  if ( bytes_read > 0 ) {
+    inbound_plaintext_.push( bytes_read );
+  }
+}
+
+void TCPSession::do_write()
+{
+  const string_view source = outbound_plaintext_.readable_region();
+  const int bytes_written = socket_.write( source );
+
+  if ( bytes_written > 0 ) {
+    outbound_plaintext_.pop( bytes_written );
+  }
+
+  return;
+}

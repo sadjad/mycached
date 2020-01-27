@@ -2,6 +2,7 @@
 
 #include "address.hh"
 #include "file_descriptor.hh"
+#include "ring_buffer.hh"
 
 #include <cstdint>
 #include <functional>
@@ -111,4 +112,34 @@ public:
 
   //! Accept a new incoming connection
   TCPSocket accept();
+};
+
+class TCPSession
+{
+private:
+  static constexpr size_t storage_size = 65536;
+
+  TCPSocket socket_;
+
+  RingBuffer outbound_plaintext_ { storage_size };
+  RingBuffer inbound_plaintext_ { storage_size };
+
+public:
+  TCPSession( TCPSocket&& sock )
+    : socket_( std::move( sock ) )
+  {}
+
+  RingBuffer& outbound_plaintext() { return outbound_plaintext_; }
+  RingBuffer& inbound_plaintext() { return inbound_plaintext_; }
+
+  TCPSocket& socket() { return socket_; }
+
+  void do_read();
+  void do_write();
+
+  bool want_read() const { return true; }
+  bool want_write() const
+  {
+    return outbound_plaintext_.readable_region().empty();
+  }
 };
