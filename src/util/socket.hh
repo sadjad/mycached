@@ -137,9 +137,6 @@ public:
   void do_read();
   void do_write();
 
-  bool want_read() const { return true; }
-  bool want_write() const
-  {
-    return outbound_plaintext_.readable_region().empty();
-  }
+  bool want_read() const { return not inbound_plaintext_.writable_region().empty(); }
+  bool want_write() const { return not outbound_plaintext_.readable_region().empty(); }
 };
