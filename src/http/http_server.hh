@@ -19,9 +19,8 @@ class HTTPServer
 
   void load()
   {
-    if ( ( not current_response_unsent_headers_.empty() )
-         or ( not current_response_unsent_body_.empty() )
-         or ( requests_.empty() ) ) {
+    if ( ( not current_response_unsent_headers_.empty() ) or ( not current_response_unsent_body_.empty() )
+         or ( responses_.empty() ) ) {
       throw std::runtime_error( "HTTPServer cannot load new response" );
     }
 
@@ -35,32 +34,27 @@ public:
   {
     responses_.push( std::move( res ) );
 
-    if ( current_response_unsent_headers_.empty()
-         and current_response_unsent_body_.empty() ) {
+    if ( current_response_unsent_headers_.empty() and current_response_unsent_body_.empty() ) {
       load();
     }
   }
 
   bool responses_empty() const
   {
-    return current_response_unsent_headers_.empty()
-           and current_response_unsent_body_.empty() and responses_.empty();
+    return current_response_unsent_headers_.empty() and current_response_unsent_body_.empty() and responses_.empty();
   }
 
   template<class Writable>
   void write( Writable& out )
   {
     if ( responses_empty() ) {
-      throw std::runtime_error(
-        "HTTPServer::write(): HTTPServer has no more responses" );
+      throw std::runtime_error( "HTTPServer::write(): HTTPServer has no more responses" );
     }
 
     if ( not current_response_unsent_headers_.empty() ) {
-      current_response_unsent_headers_.remove_prefix(
-        out.write( current_response_unsent_headers_ ) );
+      current_response_unsent_headers_.remove_prefix( out.write( current_response_unsent_headers_ ) );
     } else if ( not current_response_unsent_body_.empty() ) {
-      current_response_unsent_body_.remove_prefix(
-        out.write( current_response_unsent_body_ ) );
+      current_response_unsent_body_.remove_prefix( out.write( current_response_unsent_body_ ) );
     } else {
       responses_.pop();
       if ( not responses_.empty() ) {
@@ -69,10 +63,7 @@ public:
     }
   }
 
-  void read( RingBuffer& in )
-  {
-    in.pop( requests_.parse( in.readable_region() ) );
-  }
+  void read( RingBuffer& in ) { in.pop( requests_.parse( in.readable_region() ) ); }
 
   bool requests_empty() const { return requests_.empty(); }
   const HTTPRequest& requests_front() const { return requests_.front(); }
