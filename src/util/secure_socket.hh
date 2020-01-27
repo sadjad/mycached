@@ -139,6 +139,7 @@ class SSLSession
   SSL_handle ssl_;
 
   TCPSocketBIO socket_;
+  bool incoming_stream_terminated_ = false;
 
   RingBuffer outbound_plaintext_ { storage_size };
   RingBuffer inbound_plaintext_ { storage_size };

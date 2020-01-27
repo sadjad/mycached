@@ -224,7 +224,8 @@ int SSLSession::get_error( const int return_value ) const
 
 bool SSLSession::want_read() const
 {
-  return ( not read_waiting_on_write_ ) and ( not inbound_plaintext_.writable_region().empty() );
+  return ( not read_waiting_on_write_ ) and ( not inbound_plaintext_.writable_region().empty() )
+         and ( not incoming_stream_terminated_ );
 }
 
 bool SSLSession::want_write() const
@@ -254,6 +255,7 @@ void SSLSession::do_read()
   const int error_return = get_error( bytes_read );
 
   if ( bytes_read == 0 and error_return == SSL_ERROR_ZERO_RETURN ) {
+    incoming_stream_terminated_ = true;
     return;
   }
 

@@ -3,7 +3,7 @@ AM_CXXFLAGS = $(PICKY_CXXFLAGS)
 
 LAMBDA_FLAGS = -ldl -static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
 
-bin_PROGRAMS = fun cat udp-reflect udp-receiver
+bin_PROGRAMS = fun cat udp-reflect udp-receiver aws-fun
 
 fun_SOURCES = fun.cc
 fun_LDADD = ../http/libmushhttp.a ../util/libmushutil.a $(SSL_LIBS) $(srcdir)/../util/elf-info.ld
@@ -17,3 +17,6 @@ udp_reflect_LDFLAGS = $(LAMBDA_FLAGS)
 
 udp_receiver_SOURCES = udp-receiver.cc
 udp_receiver_LDADD = ../util/libmushutil.a
+
+aws_fun_SOURCES = aws-fun.cc
+aws_fun_LDADD = ../http/libmushhttp.a ../util/libmushutil.a $(SSL_LIBS) $(srcdir)/../util/elf-info.ld

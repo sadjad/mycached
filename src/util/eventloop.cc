@@ -139,8 +139,7 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       const auto count_before = this_rule.service_count();
       this_rule.callback();
 
-      // only check for busy wait if we're not canceling or exiting
-      if ( count_before == this_rule.service_count() and this_rule.interest() ) {
+      if ( count_before == this_rule.service_count() and ( not this_rule.fd.closed() ) and this_rule.interest() ) {
         throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
                              + "\" did not read/write fd and is still interested" );
       }
