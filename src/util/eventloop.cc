@@ -121,7 +121,7 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
     auto& this_rule = **it;
 
     if ( this_rule.cancel_requested ) {
-      this_rule.cancel();
+      /* this_rule.cancel(); */
       it = _fd_rules.erase( it );
       continue;
     }
