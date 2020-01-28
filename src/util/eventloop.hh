@@ -2,7 +2,9 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 #include <string_view>
+#include <variant>
 
 #include <poll.h>
 
@@ -38,6 +40,7 @@ private:
     InterestT interest;  //!< A callback that returns `true` whenever fd should be polled.
     CallbackT cancel;    //!< A callback that is called when the rule is cancelled (e.g. on hangup)
     size_t category_id;
+    bool cancel_requested;
 
     //! Returns the number of times fd has been read or written, depending on the value of Rule::direction.
     //! \details This function is used internally by EventLoop; you will not need to call it
@@ -49,11 +52,12 @@ private:
     CallbackT callback;
     InterestT interest;
     size_t category_id;
+    bool cancel_requested;
   };
 
   std::vector<RuleCategory> _rule_categories {};
-  std::list<FDRule> _fd_rules {};
-  std::list<NonFDRule> _non_fd_rules {};
+  std::list<std::shared_ptr<FDRule>> _fd_rules {};
+  std::list<std::shared_ptr<NonFDRule>> _non_fd_rules {};
 
 public:
   //! Returned by each call to EventLoop::wait_next_event.
@@ -66,7 +70,20 @@ public:
 
   size_t add_category( const std::string& name );
 
-  void add_rule(
+  class RuleHandle
+  {
+    std::variant<std::weak_ptr<FDRule>, std::weak_ptr<NonFDRule>> rule_;
+
+  public:
+    template<class R>
+    RuleHandle( std::shared_ptr<R> x )
+      : rule_( x )
+    {}
+
+    void cancel();
+  };
+
+  RuleHandle add_rule(
     const size_t category_id,
     const FileDescriptor& fd,
     const Direction direction,
@@ -74,7 +91,7 @@ public:
     const InterestT& interest = [] { return true; },
     const CallbackT& cancel = [] {} );
 
-  void add_rule(
+  RuleHandle add_rule(
     const size_t category_id,
     const CallbackT& callback,
     const InterestT& interest = [] { return true; } );
@@ -86,9 +103,9 @@ public:
 
   // convenience function to add category and rule at the same time
   template<typename... Targs>
-  void add_rule( const std::string& name, Targs&&... Fargs )
+  auto add_rule( const std::string& name, Targs&&... Fargs )
   {
-    add_rule( add_category( name ), std::forward<Targs>( Fargs )... );
+    return add_rule( add_category( name ), std::forward<Targs>( Fargs )... );
   }
 };
 

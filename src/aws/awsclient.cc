@@ -28,40 +28,45 @@ AWSClient::AWSClient( const string& region )
 
 void AWSClient::install_rules( EventLoop& event_loop )
 {
-  event_loop.add_rule(
+  rules_.push_back( event_loop.add_rule(
     "SSL read",
     ssl_session_.socket(),
     Direction::In,
     [&] { ssl_session_.do_read(); },
-    [&] { return ssl_session_.want_read(); } );
+    [&] { return ssl_session_.want_read(); } ) );
 
-  event_loop.add_rule(
+  rules_.push_back( event_loop.add_rule(
     "SSL write",
     ssl_session_.socket(),
     Direction::Out,
     [&] { ssl_session_.do_write(); },
-    [&] { return ssl_session_.want_write(); } );
+    [&] { return ssl_session_.want_write(); } ) );
 
-  event_loop.add_rule(
+  rules_.push_back( event_loop.add_rule(
     "HTTP write",
     [&] { http_.write( ssl_session_.outbound_plaintext() ); },
     [&] {
       return ( not ssl_session_.outbound_plaintext().writable_region().empty() ) and ( not http_.requests_empty() );
-    } );
+    } ) );
 
-  event_loop.add_rule(
+  rules_.push_back( event_loop.add_rule(
     "HTTP read",
     [&] { http_.read( ssl_session_.inbound_plaintext() ); },
-    [&] { return not ssl_session_.inbound_plaintext().readable_region().empty(); } );
+    [&] { return not ssl_session_.inbound_plaintext().readable_region().empty(); } ) );
 
-  event_loop.add_rule(
+  rules_.push_back( event_loop.add_rule(
     "print HTTP response",
     [&] {
       cerr << "Response received: " << http_.responses_front().first_line() << "\n";
       cerr << http_.responses_front().body() << "\n";
       http_.pop_response();
+
+      // remove all rules...
+      for ( auto& rule : rules_ ) {
+        rule.cancel();
+      }
     },
-    [&] { return not http_.responses_empty(); } );
+    [&] { return not http_.responses_empty(); } ) );
 }
 
 void AWSClient::get_account_settings()

@@ -20,25 +20,46 @@ size_t EventLoop::add_category( const string& name )
   return _rule_categories.size() - 1;
 }
 
-void EventLoop::add_rule( const size_t category_id,
-                          const FileDescriptor& fd,
-                          const Direction direction,
-                          const CallbackT& callback,
-                          const InterestT& interest,
-                          const CallbackT& cancel )
+EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
+                                           const FileDescriptor& fd,
+                                           const Direction direction,
+                                           const CallbackT& callback,
+                                           const InterestT& interest,
+                                           const CallbackT& cancel )
 {
   if ( category_id >= _rule_categories.size() ) {
     throw out_of_range( "bad category_id" );
   }
-  _fd_rules.push_back( { fd.duplicate(), direction, callback, interest, cancel, category_id } );
+
+  _fd_rules.emplace_back(
+    make_shared<FDRule>( FDRule { fd.duplicate(), direction, callback, interest, cancel, category_id, false } ) );
+
+  return _fd_rules.back();
 }
 
-void EventLoop::add_rule( const size_t category_id, const CallbackT& callback, const InterestT& interest )
+EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
+                                           const CallbackT& callback,
+                                           const InterestT& interest )
 {
   if ( category_id >= _rule_categories.size() ) {
     throw out_of_range( "bad category_id" );
   }
-  _non_fd_rules.push_back( { callback, interest, category_id } );
+
+  _non_fd_rules.emplace_back( make_shared<NonFDRule>( NonFDRule { callback, interest, category_id, false } ) );
+
+  return _non_fd_rules.back();
+}
+
+void EventLoop::RuleHandle::cancel()
+{
+  visit(
+    []( auto&& rule_weak_ptr ) {
+      auto rule_shared_ptr = rule_weak_ptr.lock();
+      if ( rule_shared_ptr ) {
+        rule_shared_ptr->cancel_requested = true;
+      }
+    },
+    rule_ );
 }
 
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
@@ -49,7 +70,14 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
     while ( true ) {
       ++iterations;
       bool rule_fired = false;
-      for ( auto& this_rule : _non_fd_rules ) {
+      for ( auto it = _non_fd_rules.begin(); it != _non_fd_rules.end(); ) {
+        auto& this_rule = **it;
+
+        if ( this_rule.cancel_requested ) {
+          it = _non_fd_rules.erase( it );
+          continue;
+        }
+
         if ( this_rule.interest() ) {
           if ( iterations > 128 ) {
             throw runtime_error( "EventLoop: busy wait detected: rule \""
@@ -63,6 +91,8 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
           };
           this_rule.callback();
         }
+
+        ++it;
       }
 
       if ( not rule_fired ) {
@@ -78,7 +108,14 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 
   // set up the pollfd for each rule
   for ( auto it = _fd_rules.begin(); it != _fd_rules.end(); ) { // NOTE: it gets erased or incremented in loop body
-    auto& this_rule = *it;
+    auto& this_rule = **it;
+
+    if ( this_rule.cancel_requested ) {
+      this_rule.cancel();
+      it = _fd_rules.erase( it );
+      continue;
+    }
+
     if ( this_rule.direction == Direction::In && this_rule.fd.eof() ) {
       // no more reading on this rule, it's reached eof
       this_rule.cancel();
@@ -117,7 +154,7 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
   // go through the poll results
   for ( auto [it, idx] = make_pair( _fd_rules.begin(), size_t( 0 ) ); it != _fd_rules.end(); ++idx ) {
     const auto& this_pollfd = pollfds[idx];
-    auto& this_rule = *it;
+    auto& this_rule = **it;
 
     const auto poll_error = static_cast<bool>( this_pollfd.revents & ( POLLERR | POLLNVAL ) );
     if ( poll_error ) {

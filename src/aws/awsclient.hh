@@ -15,6 +15,8 @@ class AWSClient
   SSLSession ssl_session_;
   HTTPClient http_;
 
+  std::vector<EventLoop::RuleHandle> rules_ {};
+
 public:
   AWSClient( const std::string& region );
 
