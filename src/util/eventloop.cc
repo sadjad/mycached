@@ -35,17 +35,25 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
 {
   // first, handle the non-file-descriptor-related rules
   {
-    for ( auto& this_rule : _non_fd_rules ) {
-      RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
-      uint8_t iterations = 0;
-      while ( this_rule.interest() ) {
-        this_rule.callback();
-        ++iterations;
-        if ( iterations > 128 ) {
-          throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
-                               + "\" is still interested after running callback " + to_string( iterations )
-                               + " times" );
+    unsigned int iterations = 0;
+    while ( true ) {
+      ++iterations;
+      bool rule_fired = false;
+      for ( auto& this_rule : _non_fd_rules ) {
+        if ( this_rule.interest() ) {
+          if ( iterations > 128 ) {
+            throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
+                                 + "\" is still interested after " + to_string( iterations ) + " iterations" );
+          }
+
+          rule_fired = true;
+          RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
+          this_rule.callback();
         }
+      }
+
+      if ( not rule_fired ) {
+        break;
       }
     }
   }
