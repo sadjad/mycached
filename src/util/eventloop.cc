@@ -79,7 +79,6 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       continue;
     }
 
-    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
     if ( this_rule.interest() ) {
       pollfds.push_back( { this_rule.fd.fd_num(), static_cast<short>( this_rule.direction ), 0 } );
       something_to_poll = true;
