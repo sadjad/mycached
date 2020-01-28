@@ -173,7 +173,11 @@ int main( int argc, char* argv[] )
                                              { "Content-Length", "0" } },
                                            "" } );
             } else {
-              throw runtime_error( "invalid request" );
+              client.http.push_response( { "HTTP/1.1 405 Method Not Allowed",
+                                           { { "Server", "mycached/0.0.1" },
+                                             { "X-Object-Key", key },
+                                             { "Content-Length", "0" } },
+                                           "" } );
             }
 
             client.http.pop_request();
