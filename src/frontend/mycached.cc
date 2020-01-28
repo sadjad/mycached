@@ -8,6 +8,7 @@
 #include "util/eventloop.hh"
 #include "util/exception.hh"
 #include "util/socket.hh"
+#include "util/tokenize.hh"
 
 using namespace std;
 
@@ -40,6 +41,8 @@ int main( int argc, char* argv[] )
       usage( argv[0] );
       return EXIT_FAILURE;
     }
+
+    unordered_map<string, string> data_store;
 
     uint64_t client_id { 0 };
     unordered_map<uint64_t, Client> clients;
@@ -112,13 +115,34 @@ int main( int argc, char* argv[] )
           "request",
           [&] {
             auto& request = client.http.requests_front();
-            cerr << "request received: " << request.first_line() << endl;
-            client.http.pop_request();
+            const auto tokens = split( request.first_line(), " " );
 
-            client.http.push_response(
-              { "HTTP/1.1 200 OK",
-                { { "Server", "mycached/0.0.1" }, { "Content-Length", "1" } },
-                "A" } );
+            const string& method = tokens.at( 0 );
+            const string& key = tokens.at( 1 ).substr( 1 );
+
+            if ( method == "GET" ) {
+              client.http.push_response(
+                { "HTTP/1.1 200 OK",
+                  { { "Server", "mycached/0.0.1" },
+                    { "X-Object-Key", key },
+                    { "Content-Length",
+                      to_string( data_store.at( key ).length() ) } },
+                  move( data_store.at( key ) ) } );
+
+              data_store.erase( key );
+            } else if ( method == "PUT" ) {
+              data_store.emplace( key, move( request.body() ) );
+
+              client.http.push_response( { "HTTP/1.1 200 OK",
+                                           { { "Server", "mycached/0.0.1" },
+                                             { "X-Object-Key", key },
+                                             { "Content-Length", "0" } },
+                                           "" } );
+            } else {
+              throw runtime_error( "invalid request" );
+            }
+
+            client.http.pop_request();
           },
           [&] { return not client.http.requests_empty(); } ) );
 
