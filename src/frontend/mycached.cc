@@ -86,6 +86,16 @@ int main( int argc, char* argv[] )
           } );
 
         event_loop.add_rule(
+          "HTTP write",
+          [&] { client.http.write( client.session.outbound_plaintext() ); },
+          [&]() {
+            return not client.session.outbound_plaintext()
+                         .writable_region()
+                         .empty()
+                   and not client.http.responses_empty();
+          } );
+
+        event_loop.add_rule(
           "request",
           [&]() {
             auto& request = client.http.requests_front();
@@ -99,15 +109,6 @@ int main( int argc, char* argv[] )
           },
           [&]() { return not client.http.requests_empty(); } );
 
-        event_loop.add_rule(
-          "HTTP write",
-          [&] { client.http.write( client.session.outbound_plaintext() ); },
-          [&]() {
-            return not client.session.outbound_plaintext()
-                         .writable_region()
-                         .empty()
-                   and not client.http.responses_empty();
-          } );
         client_id++;
       },
       []() { return true; },
