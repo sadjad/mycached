@@ -24,7 +24,7 @@ private:
   using CallbackT = std::function<void( void )>;
   using InterestT = std::function<bool( void )>;
 
-  struct RuleInfo
+  struct RuleCategory
   {
     std::string name;
     Timer::Record timer;
@@ -37,7 +37,7 @@ private:
     CallbackT callback;  //!< A callback that reads or writes fd.
     InterestT interest;  //!< A callback that returns `true` whenever fd should be polled.
     CallbackT cancel;    //!< A callback that is called when the rule is cancelled (e.g. on hangup)
-    size_t info_index;
+    size_t category_id;
 
     //! Returns the number of times fd has been read or written, depending on the value of Rule::direction.
     //! \details This function is used internally by EventLoop; you will not need to call it
@@ -48,10 +48,10 @@ private:
   {
     CallbackT callback;
     InterestT interest;
-    size_t info_index;
+    size_t category_id;
   };
 
-  std::vector<RuleInfo> _rule_info {};
+  std::vector<RuleCategory> _rule_categories {};
   std::list<FDRule> _fd_rules {};
   std::list<NonFDRule> _non_fd_rules {};
 
@@ -64,9 +64,10 @@ public:
     Exit //!< All rules have been canceled or were uninterested; make no further calls to EventLoop::wait_next_event.
   };
 
-  //! Add a rule whose callback will be called when `fd` is ready in the specified Direction.
+  size_t add_category( const std::string& name );
+
   void add_rule(
-    const std::string& name,
+    const size_t category_id,
     const FileDescriptor& fd,
     const Direction direction,
     const CallbackT& callback,
@@ -74,7 +75,7 @@ public:
     const CallbackT& cancel = [] {} );
 
   void add_rule(
-    const std::string& name,
+    const size_t category_id,
     const CallbackT& callback,
     const InterestT& interest = [] { return true; } );
 
@@ -82,6 +83,13 @@ public:
   Result wait_next_event( const int timeout_ms );
 
   std::string summary() const;
+
+  // convenience function to add category and rule at the same time
+  template<typename... Targs>
+  void add_rule( const std::string& name, Targs&&... Fargs )
+  {
+    add_rule( add_category( name ), std::forward<Targs>( Fargs )... );
+  }
 };
 
 using Direction = EventLoop::Direction;

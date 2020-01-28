@@ -14,21 +14,31 @@ unsigned int EventLoop::FDRule::service_count() const
   return direction == Direction::In ? fd.read_count() : fd.write_count();
 }
 
-void EventLoop::add_rule( const string& name,
+size_t EventLoop::add_category( const string& name )
+{
+  _rule_categories.push_back( { name, {} } );
+  return _rule_categories.size() - 1;
+}
+
+void EventLoop::add_rule( const size_t category_id,
                           const FileDescriptor& fd,
                           const Direction direction,
                           const CallbackT& callback,
                           const InterestT& interest,
                           const CallbackT& cancel )
 {
-  _rule_info.push_back( { name, {} } );
-  _fd_rules.push_back( { fd.duplicate(), direction, callback, interest, cancel, _rule_info.size() - 1 } );
+  if ( category_id >= _rule_categories.size() ) {
+    throw out_of_range( "bad category_id" );
+  }
+  _fd_rules.push_back( { fd.duplicate(), direction, callback, interest, cancel, category_id } );
 }
 
-void EventLoop::add_rule( const string& name, const CallbackT& callback, const InterestT& interest )
+void EventLoop::add_rule( const size_t category_id, const CallbackT& callback, const InterestT& interest )
 {
-  _rule_info.push_back( { name, {} } );
-  _non_fd_rules.push_back( { callback, interest, _rule_info.size() - 1 } );
+  if ( category_id >= _rule_categories.size() ) {
+    throw out_of_range( "bad category_id" );
+  }
+  _non_fd_rules.push_back( { callback, interest, category_id } );
 }
 
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
@@ -42,12 +52,15 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       for ( auto& this_rule : _non_fd_rules ) {
         if ( this_rule.interest() ) {
           if ( iterations > 128 ) {
-            throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
-                                 + "\" is still interested after " + to_string( iterations ) + " iterations" );
+            throw runtime_error( "EventLoop: busy wait detected: rule \""
+                                 + _rule_categories.at( this_rule.category_id ).name + "\" is still interested after "
+                                 + to_string( iterations ) + " iterations" );
           }
 
           rule_fired = true;
-          RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
+          RecordScopeTimer<Timer::Category::Nonblock> record_timer {
+            _rule_categories.at( this_rule.category_id ).timer
+          };
           this_rule.callback();
         }
       }
@@ -113,14 +126,15 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
       socklen_t optlen = sizeof( socket_error );
       const int ret = getsockopt( this_rule.fd.fd_num(), SOL_SOCKET, SO_ERROR, &socket_error, &optlen );
       if ( ret == -1 and errno == ENOTSOCK ) {
-        throw runtime_error( "error on polled file descriptor for rule \"" + _rule_info.at( this_rule.info_index ).name
-                             + "\"" );
+        throw runtime_error( "error on polled file descriptor for rule \""
+                             + _rule_categories.at( this_rule.category_id ).name + "\"" );
       } else if ( ret == -1 ) {
         throw unix_error( "getsockopt" );
       } else if ( optlen != sizeof( socket_error ) ) {
         throw runtime_error( "unexpected length from getsockopt: " + to_string( optlen ) );
       } else if ( socket_error ) {
-        throw unix_error( "error on polled socket for rule \"" + _rule_info.at( this_rule.info_index ).name + "\"",
+        throw unix_error( "error on polled socket for rule \"" + _rule_categories.at( this_rule.category_id ).name
+                            + "\"",
                           socket_error );
       }
 
@@ -141,13 +155,14 @@ EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
     }
 
     if ( poll_ready ) {
-      RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_info.at( this_rule.info_index ).timer };
+      RecordScopeTimer<Timer::Category::Nonblock> record_timer { _rule_categories.at( this_rule.category_id ).timer };
       // we only want to call callback if revents includes the event we asked for
       const auto count_before = this_rule.service_count();
       this_rule.callback();
 
       if ( count_before == this_rule.service_count() and ( not this_rule.fd.closed() ) and this_rule.interest() ) {
-        throw runtime_error( "EventLoop: busy wait detected: rule \"" + _rule_info.at( this_rule.info_index ).name
+        throw runtime_error( "EventLoop: busy wait detected: rule \""
+                             + _rule_categories.at( this_rule.category_id ).name
                              + "\" did not read/write fd and is still interested" );
       }
     }
@@ -166,7 +181,7 @@ string EventLoop::summary() const
 
   out << "EventLoop timing summary\n------------------------\n\n";
 
-  for ( const auto& rule : _rule_info ) {
+  for ( const auto& rule : _rule_categories ) {
     const auto& name = rule.name;
     const auto& timer = rule.timer;
 
