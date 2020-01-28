@@ -50,6 +50,7 @@ int main( int argc, char* argv[] )
     const Address listen_address { "0.0.0.0", port };
 
     TCPSocket listen_sock;
+    listen_sock.set_reuseaddr();
     listen_sock.set_blocking( false );
     listen_sock.bind( listen_address );
     listen_sock.listen();
@@ -67,19 +68,26 @@ int main( int argc, char* argv[] )
         Client& client = clients.at( client_id );
         client.session.socket().set_blocking( false );
 
+        auto cancel_callback = [&] {
+          event_loop.remove_rules( client.handles );
+          clients.erase( client.id );
+        };
+
         client.handles.push_back(
           event_loop.add_rule( "client read",
                                client.session.socket(),
                                Direction::In,
-                               [&]() { client.session.do_read(); },
-                               [&]() { return client.session.want_read(); } ) );
+                               [&] { client.session.do_read(); },
+                               [&] { return client.session.want_read(); },
+                               cancel_callback ) );
 
-        client.handles.push_back( event_loop.add_rule(
-          "client write",
-          client.session.socket(),
-          Direction::Out,
-          [&]() { client.session.do_write(); },
-          [&]() { return client.session.want_write(); } ) );
+        client.handles.push_back(
+          event_loop.add_rule( "client write",
+                               client.session.socket(),
+                               Direction::Out,
+                               [&] { client.session.do_write(); },
+                               [&] { return client.session.want_write(); },
+                               cancel_callback ) );
 
         client.handles.push_back( event_loop.add_rule(
           "HTTP read",
@@ -93,7 +101,7 @@ int main( int argc, char* argv[] )
         client.handles.push_back( event_loop.add_rule(
           "HTTP write",
           [&] { client.http.write( client.session.outbound_plaintext() ); },
-          [&]() {
+          [&] {
             return not client.session.outbound_plaintext()
                          .writable_region()
                          .empty()
@@ -102,7 +110,7 @@ int main( int argc, char* argv[] )
 
         client.handles.push_back( event_loop.add_rule(
           "request",
-          [&]() {
+          [&] {
             auto& request = client.http.requests_front();
             cerr << "request received: " << request.first_line() << endl;
             client.http.pop_request();
@@ -112,12 +120,12 @@ int main( int argc, char* argv[] )
                 { { "Server", "mycached/0.0.1" }, { "Content-Length", "1" } },
                 "A" } );
           },
-          [&]() { return not client.http.requests_empty(); } ) );
+          [&] { return not client.http.requests_empty(); } ) );
 
         client_id++;
       },
-      []() { return true; },
-      []() { throw runtime_error( "listen socket cancelled" ); } );
+      [] { return true; },
+      [] { throw runtime_error( "listen socket cancelled" ); } );
 
     while ( event_loop.wait_next_event( -1 ) != EventLoop::Result::Exit )
       ;
