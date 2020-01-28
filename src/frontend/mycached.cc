@@ -12,17 +12,43 @@
 
 using namespace std;
 
+template<typename E>
+constexpr auto to_underlying( E e ) noexcept
+{
+  return static_cast<std::underlying_type_t<E>>( e );
+}
+
 void usage( char* argv0 )
 {
   cerr << "Usage: " << argv0 << " PORT" << endl;
 }
+
+enum class RuleCategory : size_t
+{
+  SocketRead,
+  SocketWrite,
+  HTTPServerRead,
+  HTTPServerWrite,
+  ProcessRequest,
+
+  COUNT
+};
+
+static constexpr char const*
+  CATEGORY_NAMES[to_underlying( RuleCategory::COUNT )]
+  = {
+      "SocketRead",      "SocketWrite",    "HTTPServerRead",
+      "HTTPServerWrite", "ProcessRequest",
+    };
+
+static size_t CATEGORY_IDS[to_underlying( RuleCategory::COUNT )] = { 0 };
 
 struct Client
 {
   uint64_t id;
   TCPSession session;
   HTTPServer http {};
-  list<EventLoop::Handle> handles {};
+  list<EventLoop::RuleHandle> handles {};
 
   Client( const uint64_t id, TCPSocket&& socket )
     : id( id )
@@ -49,6 +75,11 @@ int main( int argc, char* argv[] )
 
     EventLoop event_loop;
 
+    // initialize the categories
+    for ( size_t i = 0; i < to_underlying( RuleCategory::COUNT ); i++ ) {
+      CATEGORY_IDS[i] = event_loop.add_category( CATEGORY_NAMES[i] );
+    }
+
     const uint16_t port = static_cast<uint16_t>( stoi( argv[1] ) );
     const Address listen_address { "0.0.0.0", port };
 
@@ -72,28 +103,31 @@ int main( int argc, char* argv[] )
         client.session.socket().set_blocking( false );
 
         auto cancel_callback = [&] {
-          event_loop.remove_rules( client.handles );
+          for ( auto& handle : client.handles ) {
+            handle.cancel();
+          }
+
           clients.erase( client.id );
         };
 
-        client.handles.push_back(
-          event_loop.add_rule( "client read",
-                               client.session.socket(),
-                               Direction::In,
-                               [&] { client.session.do_read(); },
-                               [&] { return client.session.want_read(); },
-                               cancel_callback ) );
-
-        client.handles.push_back(
-          event_loop.add_rule( "client write",
-                               client.session.socket(),
-                               Direction::Out,
-                               [&] { client.session.do_write(); },
-                               [&] { return client.session.want_write(); },
-                               cancel_callback ) );
+        client.handles.push_back( event_loop.add_rule(
+          CATEGORY_IDS[to_underlying( RuleCategory::SocketRead )],
+          client.session.socket(),
+          Direction::In,
+          [&] { client.session.do_read(); },
+          [&] { return client.session.want_read(); },
+          cancel_callback ) );
 
         client.handles.push_back( event_loop.add_rule(
-          "HTTP read",
+          CATEGORY_IDS[to_underlying( RuleCategory::SocketWrite )],
+          client.session.socket(),
+          Direction::Out,
+          [&] { client.session.do_write(); },
+          [&] { return client.session.want_write(); },
+          cancel_callback ) );
+
+        client.handles.push_back( event_loop.add_rule(
+          CATEGORY_IDS[to_underlying( RuleCategory::HTTPServerRead )],
           [&] { client.http.read( client.session.inbound_plaintext() ); },
           [&] {
             return not client.session.inbound_plaintext()
@@ -102,7 +136,7 @@ int main( int argc, char* argv[] )
           } ) );
 
         client.handles.push_back( event_loop.add_rule(
-          "HTTP write",
+          CATEGORY_IDS[to_underlying( RuleCategory::HTTPServerWrite )],
           [&] { client.http.write( client.session.outbound_plaintext() ); },
           [&] {
             return not client.session.outbound_plaintext()
@@ -112,7 +146,7 @@ int main( int argc, char* argv[] )
           } ) );
 
         client.handles.push_back( event_loop.add_rule(
-          "request",
+          CATEGORY_IDS[to_underlying( RuleCategory::ProcessRequest )],
           [&] {
             auto& request = client.http.requests_front();
             const auto tokens = split( request.first_line(), " " );
