@@ -59,7 +59,7 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
     throw out_of_range( "bad category_id" );
   }
 
-  _non_fd_rules.emplace_back( make_shared<BasicRule>( BasicRule { category_id, interest, callback } ) );
+  _non_fd_rules.emplace_back( make_shared<BasicRule>( category_id, interest, callback ) );
 
   return _non_fd_rules.back();
 }
