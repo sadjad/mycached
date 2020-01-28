@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include <iostream>
+#include <list>
 #include <unordered_map>
+#include <vector>
 
 #include "http/http_server.hh"
 #include "util/eventloop.hh"
@@ -19,6 +21,7 @@ struct Client
   uint64_t id;
   TCPSession session;
   HTTPServer http {};
+  list<EventLoop::Handle> handles {};
 
   Client( const uint64_t id, TCPSocket&& socket )
     : id( id )
@@ -64,28 +67,30 @@ int main( int argc, char* argv[] )
         Client& client = clients.at( client_id );
         client.session.socket().set_blocking( false );
 
-        event_loop.add_rule( "client read",
-                             client.session.socket(),
-                             Direction::In,
-                             [&]() { client.session.do_read(); },
-                             [&]() { return client.session.want_read(); } );
+        client.handles.push_back(
+          event_loop.add_rule( "client read",
+                               client.session.socket(),
+                               Direction::In,
+                               [&]() { client.session.do_read(); },
+                               [&]() { return client.session.want_read(); } ) );
 
-        event_loop.add_rule( "client write",
-                             client.session.socket(),
-                             Direction::Out,
-                             [&]() { client.session.do_write(); },
-                             [&]() { return client.session.want_write(); } );
+        client.handles.push_back( event_loop.add_rule(
+          "client write",
+          client.session.socket(),
+          Direction::Out,
+          [&]() { client.session.do_write(); },
+          [&]() { return client.session.want_write(); } ) );
 
-        event_loop.add_rule(
+        client.handles.push_back( event_loop.add_rule(
           "HTTP read",
           [&] { client.http.read( client.session.inbound_plaintext() ); },
           [&] {
             return not client.session.inbound_plaintext()
                          .readable_region()
                          .empty();
-          } );
+          } ) );
 
-        event_loop.add_rule(
+        client.handles.push_back( event_loop.add_rule(
           "HTTP write",
           [&] { client.http.write( client.session.outbound_plaintext() ); },
           [&]() {
@@ -93,9 +98,9 @@ int main( int argc, char* argv[] )
                          .writable_region()
                          .empty()
                    and not client.http.responses_empty();
-          } );
+          } ) );
 
-        event_loop.add_rule(
+        client.handles.push_back( event_loop.add_rule(
           "request",
           [&]() {
             auto& request = client.http.requests_front();
@@ -107,7 +112,7 @@ int main( int argc, char* argv[] )
                 { { "Server", "mycached/0.0.1" }, { "Content-Length", "1" } },
                 "A" } );
           },
-          [&]() { return not client.http.requests_empty(); } );
+          [&]() { return not client.http.requests_empty(); } ) );
 
         client_id++;
       },
