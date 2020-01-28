@@ -4,7 +4,6 @@
 #include <list>
 #include <memory>
 #include <string_view>
-#include <variant>
 
 #include <poll.h>
 
@@ -32,32 +31,32 @@ private:
     Timer::Record timer;
   };
 
-  struct FDRule
+  struct BasicRule
+  {
+    size_t category_id;
+    InterestT interest;
+    CallbackT callback;
+    bool cancel_requested;
+
+    BasicRule( const size_t category_id, const InterestT& interest, const CallbackT& callback );
+  };
+
+  struct FDRule : public BasicRule
   {
     FileDescriptor fd;   //!< FileDescriptor to monitor for activity.
     Direction direction; //!< Direction::In for reading from fd, Direction::Out for writing to fd.
-    CallbackT callback;  //!< A callback that reads or writes fd.
-    InterestT interest;  //!< A callback that returns `true` whenever fd should be polled.
     CallbackT cancel;    //!< A callback that is called when the rule is cancelled (e.g. on hangup)
-    size_t category_id;
-    bool cancel_requested;
+
+    FDRule( BasicRule&& base, FileDescriptor&& fd, const Direction direction, const CallbackT& cancel );
 
     //! Returns the number of times fd has been read or written, depending on the value of Rule::direction.
     //! \details This function is used internally by EventLoop; you will not need to call it
     unsigned int service_count() const;
   };
 
-  struct NonFDRule
-  {
-    CallbackT callback;
-    InterestT interest;
-    size_t category_id;
-    bool cancel_requested;
-  };
-
   std::vector<RuleCategory> _rule_categories {};
   std::list<std::shared_ptr<FDRule>> _fd_rules {};
-  std::list<std::shared_ptr<NonFDRule>> _non_fd_rules {};
+  std::list<std::shared_ptr<BasicRule>> _non_fd_rules {};
 
 public:
   //! Returned by each call to EventLoop::wait_next_event.
@@ -72,12 +71,12 @@ public:
 
   class RuleHandle
   {
-    std::variant<std::weak_ptr<FDRule>, std::weak_ptr<NonFDRule>> rule_;
+    std::weak_ptr<BasicRule> rule_weak_ptr_;
 
   public:
-    template<class R>
-    RuleHandle( std::shared_ptr<R> x )
-      : rule_( x )
+    template<class RuleType>
+    RuleHandle( const std::shared_ptr<RuleType> x )
+      : rule_weak_ptr_( x )
     {}
 
     void cancel();

@@ -20,6 +20,20 @@ size_t EventLoop::add_category( const string& name )
   return _rule_categories.size() - 1;
 }
 
+EventLoop::BasicRule::BasicRule( const size_t category_id, const InterestT& interest, const CallbackT& callback )
+  : category_id( category_id )
+  , interest( interest )
+  , callback( callback )
+  , cancel_requested( false )
+{}
+
+EventLoop::FDRule::FDRule( BasicRule&& base, FileDescriptor&& fd, const Direction direction, const CallbackT& cancel )
+  : BasicRule( base )
+  , fd( move( fd ) )
+  , direction( direction )
+  , cancel( cancel )
+{}
+
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
                                            const FileDescriptor& fd,
                                            const Direction direction,
@@ -32,7 +46,7 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
   }
 
   _fd_rules.emplace_back(
-    make_shared<FDRule>( FDRule { fd.duplicate(), direction, callback, interest, cancel, category_id, false } ) );
+    make_shared<FDRule>( BasicRule { category_id, interest, callback }, fd.duplicate(), direction, cancel ) );
 
   return _fd_rules.back();
 }
@@ -45,21 +59,17 @@ EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
     throw out_of_range( "bad category_id" );
   }
 
-  _non_fd_rules.emplace_back( make_shared<NonFDRule>( NonFDRule { callback, interest, category_id, false } ) );
+  _non_fd_rules.emplace_back( make_shared<BasicRule>( BasicRule { category_id, interest, callback } ) );
 
   return _non_fd_rules.back();
 }
 
 void EventLoop::RuleHandle::cancel()
 {
-  visit(
-    []( auto&& rule_weak_ptr ) {
-      auto rule_shared_ptr = rule_weak_ptr.lock();
-      if ( rule_shared_ptr ) {
-        rule_shared_ptr->cancel_requested = true;
-      }
-    },
-    rule_ );
+  const shared_ptr<BasicRule> rule_shared_ptr = rule_weak_ptr_.lock();
+  if ( rule_shared_ptr ) {
+    rule_shared_ptr->cancel_requested = true;
+  }
 }
 
 EventLoop::Result EventLoop::wait_next_event( const int timeout_ms )
